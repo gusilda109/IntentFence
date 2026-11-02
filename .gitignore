@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+*.log
+live-smoke.json
+*.tsbuildinfo
+playwright-report/
+test-results/
+coverage/
+.DS_Store

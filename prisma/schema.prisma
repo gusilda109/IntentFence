@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Run {
+  id                 String             @id @default(uuid())
+  status             String
+  runIdempotencyKey  String             @unique
+  requestHash        String
+  mandateJson        Json
+  catalogSource      String             @default("fixtures")
+  proposedOrderJson  Json?
+  verdictJson        Json?
+  approvedOrderJson  Json?
+  approvedOrderId    String?            @unique
+  approvalHash       String?
+  inputHash          String?
+  replay             Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  evidence           EvidenceRecord[]
+  payment            PaymentExecution?
+  policyEvents       PolicyEvent[]
+}
+
+model EvidenceRecord {
+  id                String   @id @default(uuid())
+  runId             String
+  evidenceId        String
+  captureId         String
+  publisherId       String
+  sourceClass       String
+  contentHash       String
+  securityStatus    String
+  evidenceJson      Json
+  securityReportJson Json
+  createdAt         DateTime @default(now())
+  run               Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, evidenceId])
+  @@index([runId])
+  @@index([captureId])
+}
+
+model PaymentExecution {
+  id               String    @id @default(uuid())
+  runId            String    @unique
+  approvedOrderId  String    @unique
+  approvalHash     String
+  paypalRequestId  String    @unique
+  paypalOrderId    String?   @unique
+  paypalStatus     String?
+  approveUrl       String?
+  status           String
+  errorCode        String?
+  leaseToken       String?   @unique
+  leaseExpiresAt   DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  run              Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model PolicyEvent {
+  id         String   @id @default(uuid())
+  runId      String
+  sequence   Int
+  level      String
+  code       String
+  message    String
+  itemId     String?
+  createdAt  DateTime @default(now())
+  run        Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sequence])
+}

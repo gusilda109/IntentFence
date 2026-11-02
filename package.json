@@ -1,0 +1,47 @@
+{
+  "name": "intentfence",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} prisma migrate deploy && DATABASE_URL=${DATABASE_URL:-file:./dev.db} next dev --hostname 0.0.0.0",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "demo": "tsx scripts/demo/coffee.ts"
+  },
+  "dependencies": {
+    "@openai/agents": "0.21.0",
+    "@prisma/client": "6.19.0",
+    "next": "16.4.3",
+    "openai": "7.47.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "dotenv": "17.2.3",
+    "eslint": "9.39.2",
+    "eslint-config-next": "16.4.3",
+    "playwright": "1.64.1",
+    "prisma": "6.19.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vite-tsconfig-paths": "5.1.4",
+    "vitest": "4.1.0"
+  }
+}

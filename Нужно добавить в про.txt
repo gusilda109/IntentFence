@@ -1,0 +1,158 @@
+Нужно добавить в проект IntentFence интеграцию с Channel3 и переключатель источника товарных данных на фронтенде.
+
+Сначала изучи текущий проект, README, архитектуру Actor → Evidence → Supervisor/Policy Engine → Approval Builder → PayPal Executor, существующие demo fixtures и тесты. Затем изучи актуальную официальную документацию Channel3:
+- https://trychannel3.com/developers
+- https://channel3.ai/docs
+- https://channel3.ai/docs/llms.txt
+
+Не используй выдуманные API-поля или endpoints: ориентируйся на актуальные Search, Product Detail и, если потребуется, Lookup API. Channel3 Checkout сейчас не нужен: интегрируем только product discovery и получение данных о товарах. Платёжная граница остаётся на PayPal Orders v2.
+
+ЦЕЛЬ
+
+Пользователь должен иметь возможность перед запуском выбрать источник каталога:
+
+1. Demo fixtures — текущие локальные детерминированные сценарии.
+2. Channel3 — настоящие товарные данные, получаемые через внешний Channel3 API.
+
+Переключатель должен позволять демонстрировать проект полностью офлайн на fixtures и проверять его на реальных товарах через Channel3 без изменения кода и перезапуска сервера.
+
+ТРЕБОВАНИЯ К UI
+
+На главной форме рядом с Purchase goal / budget добавь заметный segmented control или toggle:
+
+- “Demo fixtures”
+- “Channel3 · live data”
+
+По умолчанию выбран Demo fixtures, чтобы текущее поведение не изменилось.
+
+Выбор источника должен:
+- отправляться на сервер вместе с созданием run;
+- сохраняться в snapshot run;
+- отображаться на странице результата;
+- быть виден в Evidence Timeline или рядом с ней;
+- не подменяться молча при ошибке внешнего API.
+
+Если Channel3 не настроен на сервере, UI должен показывать понятное состояние unavailable или возвращать читаемую ошибку. Нельзя незаметно переключаться обратно на fixtures.
+
+Существующие кнопки должны продолжить работать:
+- Coffee shop example · $800;
+- Incompatible printer demo · $250.
+
+Эти кнопки всегда используют Demo fixtures, даже если последним был выбран Channel3, либо явно переключают toggle на Demo fixtures.
+
+АРХИТЕКТУРА
+
+Не смешивай источник каталога с текущими APP_MODE=replay/live и PAYPAL_MODE=mock/live. Это независимые настройки.
+
+Введи отдельную абстракцию, например:
+
+- CatalogProvider;
+- FixtureCatalogProvider;
+- Channel3CatalogProvider.
+
+Actor должен получать товарных кандидатов через выбранный provider. Не встраивай HTTP-запросы Channel3 непосредственно в React-компонент или Policy Engine.
+
+Выбор источника можно передавать как catalogSource: "fixtures" | "channel3" в CreateRunInput и сохранять в Prisma Run. Если выберешь другой вариант, он должен обеспечивать те же гарантии. Добавь необходимую Prisma migration и обнови RunView/contracts.
+
+Серверная интеграция Channel3 должна поддерживать:
+- поиск кандидатов по пользовательской цели;
+- получение полных данных выбранных товаров;
+- варианты и конкретные merchant offers, если они нужны для заказа;
+- цену, валюту, availability, product URL, seller/merchant и доступные attributes;
+- timeout и ограниченное количество повторов;
+- валидацию каждого внешнего ответа через Zod;
+- безопасную обработку пустых результатов, rate limit и ошибок API.
+
+CHANNEL3_API_KEY должен читаться только на сервере. Не передавай ключ в браузер, клиентский bundle, RunView, логи или Evidence Timeline. Обнови .env.example без реальных credentials. Внешние запросы разрешай только к документированному HTTPS API Channel3; не создавай generic fetch произвольных URL и SSRF-границу.
+
+EVIDENCE И БЕЗОПАСНОСТЬ
+
+Channel3 — это агрегированный источник product data, а не автоматически независимый производительский источник.
+
+Не помечай ответ Channel3 как manufacturer или independent_reference только из-за того, что он пришёл через внешний API. При необходимости добавь отдельный sourceClass "aggregator" и учти его в publisher independence.
+
+Все названия, описания, attributes и merchant claims остаются untrusted data. Никакой текст из Channel3 не должен становиться инструкцией для агента.
+
+Для выбранных товаров сохраняй минимальный immutable snapshot только тех данных, которые реально использованы в решении:
+- канонические excerpts;
+- URL и publisher/source metadata;
+- timestamp;
+- content hash;
+- использованные offers и attributes.
+
+Не сохраняй огромный сырой ответ целиком без необходимости.
+
+Commission rate и монетизация Channel3 не должны влиять на necessity, compatibility, ranking внутри ApprovedOrder или итоговый verdict.
+
+POLICY И ПОКУПКА
+
+Не ослабляй существующие гарантии IntentFence:
+
+- каждая позиция должна получить ALLOW, BLOCK или REVIEW;
+- budget проверяется детерминированно после получения реальной цены;
+- фильтр бюджета в Channel3 — только discovery aid, а не замена Policy Engine;
+- нельзя покупать недоступный товар;
+- нельзя неявно конвертировать валюту: текущий MVP работает с USD;
+- суммы пересчитываются в integer minor units;
+- seller/aggregator claims сами по себе не доказывают necessity необязательного дополнения;
+- отсутствие доказательств совместимости должно приводить к REVIEW, а не к выдуманной совместимости;
+- явная incompatibility evidence должна блокировать товар;
+- при BLOCK и REVIEW PayPal Executor не вызывается;
+- ApprovedOrder содержит только item-level ALLOW;
+- PayPal создаёт Order, но никогда не выполняет capture;
+- повторный execute остаётся идемпотентным.
+
+Не выдумывай производительские документы из атрибутов Channel3. Если для критической совместимости нужен независимый источник, а его нет, оставляй REVIEW.
+
+Сохрани недавно добавленные защиты:
+- semantic decision нельзя подкреплять evidence другого товара;
+- malformed/missing semantic decisions не должны переносить rationale между позициями;
+- incompatibility claim имеет приоритет над semantic ALLOW.
+
+ОШИБКИ И ПУСТЫЕ РЕЗУЛЬТАТЫ
+
+Предусмотри безопасные и понятные исходы:
+- Channel3 недоступен;
+- неверный или отсутствующий API key;
+- timeout;
+- rate limit;
+- пустой поиск;
+- нет подходящих offers;
+- неподдерживаемая валюта;
+- товар исчез или стал unavailable между discovery и approval.
+
+Не показывай пользователю credentials, полный внешний ответ или внутренний stack trace. Не создавай ApprovedOrder при неполных или невалидных данных.
+
+ТЕСТЫ
+
+Не используй настоящий Channel3 API в обычном CI.
+
+Добавь:
+- unit-тесты Channel3 client с mocked HTTP/SDK;
+- contract tests для внешних ответов;
+- mapping price/offers/availability/attributes;
+- обработку timeout, rate limit, malformed response и пустого результата;
+- проверку отсутствия ключа в browser/API/logs;
+- запрет silent fallback на fixtures;
+- отсутствие влияния commission rate на verdict;
+- отсутствие независимого статуса у aggregator evidence;
+- BLOCK/REVIEW с нулевыми OAuth/Orders calls;
+- E2E переключателя и существующих fixture-сценариев;
+- как минимум один mocked Channel3 end-to-end run.
+
+Отдельный live smoke против Channel3 можно добавить только как opt-in с явной переменной окружения. Он не должен запускаться вместе с обычными тестами.
+
+КРИТЕРИИ ПРИЁМКИ
+
+1. Demo fixtures работают ровно как раньше.
+2. Coffee demo по-прежнему даёт PARTIAL_ALLOW с тремя ALLOW и одним BLOCK.
+3. Incompatible printer demo даёт BLOCK с INCOMPATIBLE и NOT_REQUESTED.
+4. При выборе Channel3 исследование использует реальные товары Channel3, а не локальные fixtures.
+5. Выбранный источник виден на странице run и подтверждается сохранённым состоянием.
+6. Evidence Timeline показывает, на основании каких Channel3/product/merchant данных принято решение.
+7. Channel3 не заменяет Supervisor, Policy Engine или PayPal.
+8. При ошибке Channel3 нет скрытого fallback и нет автоматического платежа.
+9. Ни один секрет не попадает в браузер или публичный API.
+10. npm test, Playwright E2E, typecheck, lint и production build проходят.
+
+Сначала кратко опиши найденную архитектуру и план изменений, затем реализуй интеграцию. Не ограничивайся проектировкой: внеси изменения, добавь миграции и тесты, прогони проверки и в конце перечисли изменённые файлы, новые env-переменные и команды для ручного тестирования обоих режимов.
