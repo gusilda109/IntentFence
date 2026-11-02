@@ -6,7 +6,7 @@ import {
   type Mandate,
   type ProposedOrder,
 } from "@/shared/contracts";
-import { getStoreRegistration, isAllowlistedProductUrl } from "@/modules/demo-stores";
+import { getStorePageByUrl, getStoreRegistration, isAllowlistedProductUrl } from "@/modules/demo-stores";
 import { captureStorePage } from "./evidence";
 
 export class ActorValidationError extends Error {
@@ -30,7 +30,18 @@ export function validateProposedOrder(
   } = {},
 ): ProposedOrder {
   const mandate = MandateSchema.parse(mandateInput);
-  const proposal = ProposedOrderSchema.parse(candidate);
+  const parsedProposal = ProposedOrderSchema.parse(candidate);
+  const proposal: ProposedOrder = {
+    ...parsedProposal,
+    items: parsedProposal.items.map((item) => {
+      try {
+        // Canonicalize legacy Replay URLs to the active public demo-store origin.
+        return { ...item, productUrl: getStorePageByUrl(item.productUrl).url };
+      } catch {
+        return item;
+      }
+    }),
+  };
   requireInvariant(proposal.mandateId === mandate.id, "Proposal mandateId does not match the active mandate");
 
   const itemIds = new Set<string>();

@@ -42,6 +42,7 @@ npm run db:migrate
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | SQLite URL; defaults to `file:./dev.db`. |
+| `APP_BASE_URL` | Public HTTP(S) origin for demo fixture links. Optional on Render, where `RENDER_EXTERNAL_URL` is detected automatically; otherwise defaults to `http://localhost:3000`. |
 | `APP_MODE` | `live` — real Actor/Supervisor and PayPal; `replay` — stored deterministic agent fixtures. |
 | `OPENAI_API_KEY` | Used only by the Live Actor/Supervisor. Never sent to the browser. |
 | `OPENAI_BASE_URL` | OpenAI-compatible base URL. For Qwen: `https://deepcode.ci.nsu.ru/api`; the SDK appends `/chat/completions`. |

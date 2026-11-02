@@ -1,7 +1,35 @@
 import { STORE_PAGE_HTML, type StorePageContentKey } from "./content";
 import type { CatalogEntry, StorePageDefinition, StoreRegistration } from "./types";
 
-export const LOCAL_STORE_ORIGIN = "http://localhost:3000";
+const DEFAULT_LOCAL_STORE_ORIGIN = "http://localhost:3000";
+
+function resolveStoreOrigin(): string {
+  const configured = process.env.APP_BASE_URL?.trim()
+    || process.env.RENDER_EXTERNAL_URL?.trim()
+    || DEFAULT_LOCAL_STORE_ORIGIN;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(configured);
+  } catch {
+    throw new Error("APP_BASE_URL must be a valid absolute HTTP(S) origin");
+  }
+
+  if (
+    !["http:", "https:"].includes(parsed.protocol)
+    || parsed.username
+    || parsed.password
+    || parsed.pathname !== "/"
+    || parsed.search
+    || parsed.hash
+  ) {
+    throw new Error("APP_BASE_URL must contain only an HTTP(S) origin");
+  }
+
+  return parsed.origin;
+}
+
+export const LOCAL_STORE_ORIGIN = resolveStoreOrigin();
 
 export const STORE_REGISTRY: readonly StoreRegistration[] = Object.freeze([
   Object.freeze({
@@ -109,8 +137,9 @@ export function canonicalizeStoreUrl(input: string): string {
     throw new StoreAllowlistError("Store URL is invalid");
   }
 
-  if (parsed.protocol !== "http:" || parsed.hostname !== "localhost" || parsed.port !== "3000") {
-    throw new StoreAllowlistError("Store URL is outside the local allowlist");
+  const allowedOrigins = new Set([LOCAL_STORE_ORIGIN, DEFAULT_LOCAL_STORE_ORIGIN]);
+  if (!allowedOrigins.has(parsed.origin)) {
+    throw new StoreAllowlistError("Store URL is outside the demo store allowlist");
   }
   if (parsed.username || parsed.password || parsed.search || parsed.hash) {
     throw new StoreAllowlistError("Store URL contains disallowed components");
