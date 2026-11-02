@@ -115,7 +115,7 @@ export class Channel3Client {
       body: JSON.stringify({
         query: goal,
         limit: 6,
-        config: { country: "US", currency: "USD", language: "en" },
+        config: { country: "US", currency: "USD", language: "en", mode: "agentic" },
         filters: {
           availability: ["InStock"],
           price: { max_price: budgetMinor / 100 },

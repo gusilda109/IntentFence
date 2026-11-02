@@ -94,6 +94,25 @@ describe("Supervisor replay policy", () => {
     );
   });
 
+  it("recognizes an explicitly requested TV with aggregator necessity evidence", async () => {
+    const scenario = coffeePolicyScenario();
+    const tv = scenario.proposedOrder.items[0];
+    const tvEvidence = scenario.evidence[0];
+    scenario.mandate.goal = "buy tv and sofa for my living room";
+    tv.name = "Smart TV";
+    tv.purpose = "TV entertainment display";
+    tvEvidence.evidence.source.sourceClass = "aggregator";
+    scenario.proposedOrder.items = [tv];
+    scenario.proposedOrder.evidenceIds = [tvEvidence.evidence.id];
+    scenario.proposedOrder.total = { ...tv.unitPrice };
+    scenario.evidence = [tvEvidence];
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("ALLOW");
+    expect(itemDecision(verdict, tv.id)).toMatchObject({ decision: "ALLOW", reasons: [] });
+  });
+
   it("applies the same evidence-graph rules in a different product domain", async () => {
     const scenario = workshopPolicyScenario();
     const verdict = await evaluate(scenario);

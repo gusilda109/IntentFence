@@ -589,7 +589,7 @@ function tokens(text: string): Set<string> {
       .toLocaleLowerCase()
       .split(/[^\p{L}\p{N}]+/u)
       .map((token) => token.replace(/(ing|ed|es|s)$/u, ""))
-      .filter((token) => token.length > 2 && !stopWords.has(token)),
+      .filter((token) => (token.length > 2 || token === "tv") && !stopWords.has(token)),
   );
 }
 

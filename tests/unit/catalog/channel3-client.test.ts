@@ -44,7 +44,7 @@ describe("Channel3 client contracts", () => {
     expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ "x-api-key": "server-secret" });
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({
       query: "point of sale tablet",
-      config: { country: "US", currency: "USD" },
+      config: { country: "US", currency: "USD", mode: "agentic" },
       filters: { availability: ["InStock"], price: { max_price: 800 } },
     });
     expect(String(fetchMock.mock.calls[1][0])).toContain("/v1/products/product-1?");
