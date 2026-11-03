@@ -311,7 +311,7 @@ export function MandateForm() {
             onClick={loadProtectionPackExample}
             disabled={submitting}
           >
-            <SparkIcon /> Blocked protection pack · Channel3
+            <SparkIcon /> Protection pack guard · Channel3
           </button>
           <button type="submit" className="button button-primary submit-run" data-testid="submit-run" disabled={submitting}>
             {submitting ? <span className="spinner" aria-hidden="true" /> : <ShieldCheckIcon />}

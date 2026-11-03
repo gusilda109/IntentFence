@@ -62,9 +62,15 @@ export function evidenceFromCapture(
   capture: TrustedCapture,
   input: AcquireEvidenceInput,
 ): EvidenceRecord {
-  const excerpt = input.excerpt.trim();
-  if (!excerpt || !capture.visibleText.includes(excerpt)) {
-    throw new Error("Evidence excerpt must be non-empty visible text copied verbatim from the capture");
+  const requestedExcerpt = input.excerpt.trim();
+  const excerpt = capture.visibleText.includes(requestedExcerpt)
+    ? requestedExcerpt
+    : findWhitespaceEquivalentExcerpt(capture.visibleText, requestedExcerpt);
+  if (!excerpt) {
+    const error = new Error("Evidence excerpt must be non-empty visible text copied verbatim from the capture");
+    // Live Actor treats this as invalid model output and retries the draft once.
+    error.name = "ModelBehaviorError";
+    throw error;
   }
 
   return EvidenceRecordSchema.parse({
@@ -87,6 +93,15 @@ export function evidenceFromCapture(
     },
     security: capture.securityScan.report,
   });
+}
+
+function findWhitespaceEquivalentExcerpt(visibleText: string, requestedExcerpt: string): string | undefined {
+  if (!requestedExcerpt) return undefined;
+  const pattern = requestedExcerpt
+    .split(/\s+/u)
+    .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("\\s+");
+  return new RegExp(pattern, "u").exec(visibleText)?.[0];
 }
 
 export function captureDefinition(capture: TrustedCapture): StorePageDefinition {

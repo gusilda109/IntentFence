@@ -45,6 +45,10 @@ export class ActorEvidenceSession {
     this.records.set(mandateId, mandateRecords);
   }
 
+  reset(mandateId: string): void {
+    this.records.delete(mandateId);
+  }
+
   list(mandateId: string): EvidenceRecord[] {
     return [...(this.records.get(mandateId)?.values() ?? [])].map((record) => structuredClone(record));
   }

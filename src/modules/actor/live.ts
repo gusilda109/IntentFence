@@ -1,5 +1,6 @@
 import { Agent, run, tool } from "@openai/agents";
 import { z } from "zod";
+import { withInvalidStructuredOutputRetry } from "@/server/structured-output";
 import {
   EvidenceClaimSchema,
   IdSchema,
@@ -147,9 +148,12 @@ export async function runLiveActor(
     "Research the active mandate using only this read-only catalog snapshot. Copy every evidence excerpt verbatim from its cited visibleText.",
     JSON.stringify({ mandate, catalog }),
   ].join("\n");
-  const result = await run(researchAgent, input, { maxTurns: 1 });
-  if (result.finalOutput === undefined) throw new Error("Actor did not produce an order draft");
-  const proposal = materializeOrderDraft(mandate, session, result.finalOutput);
+  const proposal = await withInvalidStructuredOutputRetry(async () => {
+    session.reset(mandate.id);
+    const result = await run(researchAgent, input, { maxTurns: 1 });
+    if (result.finalOutput === undefined) throw new Error("Actor did not produce an order draft");
+    return materializeOrderDraft(mandate, session, result.finalOutput);
+  });
   await provider.validateSelection(proposal);
   return proposal;
 }

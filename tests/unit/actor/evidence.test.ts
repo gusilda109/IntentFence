@@ -31,6 +31,22 @@ const tabletUrl = "http://localhost:3000/stores/tablet-hub/products/hubtab-s10";
     expect(record.security.status).toBe("CLEAN");
   });
 
+  it("normalizes whitespace-only differences while preserving the captured excerpt", () => {
+    const original = captureStorePage(tabletUrl, new Date("2026-02-03T04:05:06.000Z"));
+    const capture = {
+      ...original,
+      visibleText: original.visibleText.replace("A 10-inch Android", "A\n  10-inch Android"),
+    };
+
+    const record = evidenceFromCapture(capture, {
+      locator: "product article",
+      excerpt: "A 10-inch Android tablet designed for fixed or handheld counter use.",
+      claims: [{ kind: "feature", text: "The seller describes a counter tablet." }],
+    });
+
+    expect(record.evidence.excerpt).toBe("A\n  10-inch Android tablet designed for fixed or handheld counter use.");
+  });
+
   it("rejects excerpts that are absent or exist only in concealed HTML", () => {
     const capture = captureStorePage(
       "http://localhost:3000/stores/checkout-bundles/products/calibration-license",

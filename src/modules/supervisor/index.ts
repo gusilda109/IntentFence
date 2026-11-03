@@ -1,5 +1,6 @@
 import { Agent, run } from "@openai/agents";
 import { z } from "zod";
+import { withInvalidStructuredOutputRetry } from "@/server/structured-output";
 
 import {
   EvidenceRecordSchema,
@@ -104,7 +105,9 @@ export function createSupervisor(options: SupervisorOptions = {}): Supervisor {
       })),
       securityReports: validatedEvidence.map((record) => record.security),
     };
-    const result = await run(agent, JSON.stringify(semanticInput));
+    const result = await withInvalidStructuredOutputRetry(
+      () => run(agent, JSON.stringify(semanticInput)),
+    );
     const semanticVerdict = VerdictSchema.parse(result.finalOutput);
     return evaluatePolicy({
       mandate: validatedMandate,
