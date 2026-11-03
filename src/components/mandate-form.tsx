@@ -19,6 +19,8 @@ interface RunOperation {
 
 const coffeeGoal = "Set up a tablet-based point of sale for a coffee shop so staff can take orders and print customer receipts.";
 const incompatiblePrinterGoal = "Set up receipt printing for my existing HubTab S10 tablet.";
+const protectionPackGoal = "Buy the Samsung 55-inch Class The Frame Pro Neo QLED 4K TV (2026) with the 26 Month Protection Pack for my living room.";
+const noProtectionPackConstraint = "Do not include extended warranties, protection packs, or protection plans.";
 
 function makeConstraint(text = "", enforcement: "hard" | "soft" = "hard"): ConstraintDraft {
   return { id: crypto.randomUUID(), text, enforcement };
@@ -74,6 +76,16 @@ export function MandateForm() {
     setBudget("250");
     setConstraints([
       { id: crypto.randomUUID(), text: "The printer must be compatible with the existing HubTab S10.", enforcement: "hard" },
+    ]);
+    setError(null);
+  }
+
+  function loadProtectionPackExample() {
+    setCatalogSource("channel3");
+    setGoal(protectionPackGoal);
+    setBudget("1500");
+    setConstraints([
+      { id: crypto.randomUUID(), text: noProtectionPackConstraint, enforcement: "hard" },
     ]);
     setError(null);
   }
@@ -291,6 +303,15 @@ export function MandateForm() {
             disabled={submitting}
           >
             <SparkIcon /> Incompatible printer demo · $250
+          </button>
+          <button
+            type="button"
+            className="example-button"
+            data-testid="protection-pack-example"
+            onClick={loadProtectionPackExample}
+            disabled={submitting}
+          >
+            <SparkIcon /> Blocked protection pack · Channel3
           </button>
           <button type="submit" className="button button-primary submit-run" data-testid="submit-run" disabled={submitting}>
             {submitting ? <span className="spinner" aria-hidden="true" /> : <ShieldCheckIcon />}

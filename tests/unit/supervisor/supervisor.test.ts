@@ -113,6 +113,121 @@ describe("Supervisor replay policy", () => {
     expect(itemDecision(verdict, tv.id)).toMatchObject({ decision: "ALLOW", reasons: [] });
   });
 
+  it("does not let semantic necessity doubt reject a directly requested item with clean evidence", async () => {
+    const scenario = coffeePolicyScenario();
+    const tv = scenario.proposedOrder.items[0];
+    const tvEvidence = scenario.evidence[0];
+    scenario.mandate.goal = "Buy a Samsung The Frame Pro TV for my living room";
+    tv.name = "Samsung The Frame Pro 65-inch TV";
+    tv.purpose = "Samsung The Frame Pro TV for the living room";
+    tvEvidence.evidence.source.sourceClass = "aggregator";
+    scenario.proposedOrder.items = [tv];
+    scenario.proposedOrder.evidenceIds = [tvEvidence.evidence.id];
+    scenario.proposedOrder.total = { ...tv.unitPrice };
+    scenario.evidence = [tvEvidence];
+    const baseline = await evaluate(scenario);
+
+    const verdict = evaluatePolicy({
+      ...scenario,
+      semanticVerdict: {
+        ...baseline,
+        decision: "REVIEW",
+        itemDecisions: [{
+          itemId: tv.id,
+          decision: "REVIEW",
+          reasons: [{
+            code: "INSUFFICIENT_NECESSITY",
+            severity: "warning",
+            message: "Necessity is not established.",
+            itemId: tv.id,
+            evidenceIds: tv.necessityEvidenceIds,
+          }],
+        }],
+        findings: [],
+      },
+    });
+
+    expect(verdict.decision).toBe("ALLOW");
+    expect(itemDecision(verdict, tv.id)).toMatchObject({ decision: "ALLOW", reasons: [] });
+  });
+
+  it("preserves a semantic hard-constraint block for a bundled protection pack", async () => {
+    const scenario = coffeePolicyScenario();
+    const bundledTv = scenario.proposedOrder.items[0];
+    const tvEvidence = scenario.evidence[0];
+    scenario.mandate.goal = "Buy a Samsung The Frame Pro TV with a 26 Month Protection Pack";
+    scenario.mandate.constraints = [{
+      id: "no-protection-pack",
+      text: "Do not include extended warranties, protection packs, or protection plans.",
+      enforcement: "hard",
+    }];
+    bundledTv.name = "Samsung The Frame Pro TV + 26 Month Protection Pack";
+    bundledTv.purpose = "Samsung The Frame Pro TV with a 26 Month Protection Pack";
+    tvEvidence.evidence.source.sourceClass = "aggregator";
+    scenario.proposedOrder.items = [bundledTv];
+    scenario.proposedOrder.evidenceIds = [tvEvidence.evidence.id];
+    scenario.proposedOrder.total = { ...bundledTv.unitPrice };
+    scenario.evidence = [tvEvidence];
+    const baseline = await evaluate(scenario);
+
+    const verdict = evaluatePolicy({
+      ...scenario,
+      semanticVerdict: {
+        ...baseline,
+        decision: "BLOCK",
+        itemDecisions: [{
+          itemId: bundledTv.id,
+          decision: "BLOCK",
+          reasons: [{
+            code: "MANDATE_CONFLICT",
+            severity: "critical",
+            message: "The bundled protection pack violates the hard constraint.",
+            itemId: bundledTv.id,
+            evidenceIds: bundledTv.necessityEvidenceIds,
+          }],
+        }],
+        findings: [],
+      },
+    });
+
+    expect(verdict.decision).toBe("BLOCK");
+    expect(itemDecision(verdict, bundledTv.id).decision).toBe("BLOCK");
+    expect(itemDecision(verdict, bundledTv.id).reasons.map((reason) => reason.code)).toContain(
+      "MANDATE_CONFLICT",
+    );
+  });
+
+  it("keeps semantic necessity review for an optional seller add-on", async () => {
+    const scenario = coffeePolicyScenario();
+    const optionalAddOn = scenario.proposedOrder.items[3];
+    const baseline = await evaluate(scenario);
+
+    const verdict = evaluatePolicy({
+      ...scenario,
+      semanticVerdict: {
+        ...baseline,
+        decision: "REVIEW",
+        itemDecisions: scenario.proposedOrder.items.map((item) => ({
+          itemId: item.id,
+          decision: item.id === optionalAddOn.id ? "REVIEW" as const : "ALLOW" as const,
+          reasons: item.id === optionalAddOn.id ? [{
+            code: "INSUFFICIENT_NECESSITY" as const,
+            severity: "warning" as const,
+            message: "The optional add-on lacks independent necessity evidence.",
+            itemId: item.id,
+            evidenceIds: item.necessityEvidenceIds,
+          }] : [],
+        })),
+        findings: [],
+      },
+    });
+
+    expect(itemDecision(verdict, optionalAddOn.id).decision).not.toBe("ALLOW");
+    expect(itemDecision(verdict, optionalAddOn.id).reasons.map((reason) => reason.code)).toContain(
+      "SELLER_ONLY_NECESSITY",
+    );
+  });
+
   it("applies the same evidence-graph rules in a different product domain", async () => {
     const scenario = workshopPolicyScenario();
     const verdict = await evaluate(scenario);

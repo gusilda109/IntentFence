@@ -428,6 +428,7 @@ function mergeSemanticDecisions(
   // Missing or malformed model output falls back to deterministic graph semantics.
   // The independent policy checks below still apply to every resulting decision.
   const byItem = evaluateReplaySemantics(mandate, proposedOrder, evidence);
+  const recordsById = new Map(evidence.map((record) => [record.evidence.id, record]));
 
   const seen = new Set<string>();
   for (const semantic of parsed.itemDecisions) {
@@ -447,6 +448,23 @@ function mergeSemanticDecisions(
     );
     // Never let the model transfer one item's rationale to another item.
     if (hasForeignEvidence || hasMismatchedReasonItem) continue;
+
+    const cleanNecessity = usableEvidence(
+      item.necessityEvidenceIds,
+      item,
+      proposedOrder,
+      recordsById,
+    ).filter((record) => hasClaim(record.evidence, "necessity"));
+    const directlyRequested = isDirectlyRequested(mandate.goal, item)
+      || cleanNecessity.some((record) => record.evidence.source.sourceClass === "user");
+    const isContradictoryNecessityReview = semantic.decision === "REVIEW"
+      && reasons.length > 0
+      && reasons.every((reason) => reason.code === "INSUFFICIENT_NECESSITY")
+      && directlyRequested
+      && cleanNecessity.length > 0;
+    // A direct mandate plus clean necessity evidence already establishes necessity.
+    // Keep every other semantic objection, including BLOCK and mandate conflicts.
+    if (isContradictoryNecessityReview) continue;
 
     const decision = seen.has(semantic.itemId)
       ? moreRestrictive(target.decision, semantic.decision)
