@@ -94,7 +94,7 @@ export class PrismaPaymentExecutionStore implements PaymentExecutionStore {
         leaseToken: execution.leaseToken,
         view: toPaymentView(execution),
       };
-    }, { maxWait: 10_000, timeout: 15_000 });
+    }, { maxWait: 20_000, timeout: 30_000 });
   }
 
   async get(approvedOrderId: string): Promise<PaymentExecutionRecord | null> {
