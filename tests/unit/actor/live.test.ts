@@ -63,7 +63,18 @@ describe("live Actor provider compatibility", () => {
     expect(proposal.items).toHaveLength(4);
     expect(proposal.total).toEqual(replay.proposal.total);
     expect(proposal.evidenceIds).toHaveLength(6);
-    expect(session.list(mandate.id)).toHaveLength(6);
+    const trustedEvidence = session.list(mandate.id);
+    expect(trustedEvidence).toHaveLength(6);
+    for (const item of proposal.items) {
+      const references = [
+        ...item.necessityEvidenceIds,
+        ...item.compatibility.flatMap((entry) => entry.evidenceIds),
+      ];
+      for (const evidenceId of references) {
+        expect(trustedEvidence.find((record) => record.evidence.id === evidenceId)?.evidence.itemId)
+          .toBe(item.id);
+      }
+    }
     expect(sdk.agentOptions).toHaveLength(1);
     expect(sdk.agentOptions[0]).toHaveProperty("outputType");
     expect(sdk.agentOptions[0]?.tools).toEqual([]);

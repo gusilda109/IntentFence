@@ -70,7 +70,7 @@ describe("mocked Channel3 end-to-end run", () => {
     expect(JSON.stringify({ proposal, evidence, verdict, approval })).not.toContain("max_commission_rate");
   });
 
-  it("blocks an aggregator-only optional add-on with zero PayPal calls", async () => {
+  it("requires review for an aggregator-only optional add-on with zero PayPal calls", async () => {
     const mandate = { ...coffeeMandate(), goal: "Buy a point of sale tablet" };
     const { provider } = providerFor(product({
       id: "warranty-1",
@@ -89,8 +89,8 @@ describe("mocked Channel3 end-to-end run", () => {
     const verdict = await createSupervisor({ mode: "replay" }).evaluateWithEvidence(mandate, proposal, evidence);
     const createOrder = vi.fn();
 
-    expect(verdict.decision).toBe("BLOCK");
-    expect(verdict.findings.map((finding) => finding.code)).toContain("SELLER_ONLY_NECESSITY");
+    expect(verdict.decision).toBe("REVIEW");
+    expect(verdict.findings.map((finding) => finding.code)).toContain("INSUFFICIENT_NECESSITY");
     expect(verdict.itemDecisions).toHaveLength(1);
     expect(createOrder).not.toHaveBeenCalled();
   });

@@ -119,7 +119,7 @@ describe("Supervisor replay policy", () => {
     const tvEvidence = scenario.evidence[0];
     scenario.mandate.goal = "Buy a Samsung The Frame Pro TV for my living room";
     tv.name = "Samsung The Frame Pro 65-inch TV";
-    tv.purpose = "Samsung The Frame Pro TV for the living room";
+    tv.purpose = "Samsung The Frame Pro TV explicitly requested by the mandate for the living room";
     tvEvidence.evidence.source.sourceClass = "aggregator";
     scenario.proposedOrder.items = [tv];
     scenario.proposedOrder.evidenceIds = [tvEvidence.evidence.id];
@@ -236,7 +236,7 @@ describe("Supervisor replay policy", () => {
     expect(verdict.decision).toBe("PARTIAL_ALLOW");
     expect(itemDecision(verdict, base.id).decision).toBe("ALLOW");
     expect(itemDecision(verdict, attachment.id).decision).toBe("ALLOW");
-    expect(itemDecision(verdict, extra.id).decision).toBe("BLOCK");
+    expect(itemDecision(verdict, extra.id).decision).toBe("REVIEW");
     expect(itemDecision(verdict, extra.id).reasons.map((reason) => reason.code)).toContain(
       "SELLER_ONLY_NECESSITY",
     );
@@ -251,9 +251,9 @@ describe("Supervisor replay policy", () => {
 
     const verdict = await evaluate(scenario);
 
-    expect(itemDecision(verdict, attachment.id).decision).toBe("BLOCK");
+    expect(itemDecision(verdict, attachment.id).decision).toBe("REVIEW");
     expect(itemDecision(verdict, attachment.id).reasons.map((reason) => reason.code)).toContain(
-      "SELLER_ONLY_NECESSITY",
+      "INSUFFICIENT_NECESSITY",
     );
   });
 
@@ -379,6 +379,71 @@ describe("dependency closure", () => {
     expect(itemDecision(verdict, dependent.id).decision).toBe("BLOCK");
     expect(itemDecision(verdict, dependent.id).reasons.map((reason) => reason.code)).toContain(
       "UNMET_DEPENDENCY",
+    );
+  });
+});
+
+describe("mandate coverage and evidence ownership", () => {
+  it("never creates an accessory-only PARTIAL_ALLOW when the core item is blocked", async () => {
+    const scenario = dependencyPolicyScenario();
+    const [base, dependent] = scenario.proposedOrder.items;
+    dependent.compatibility = [];
+    scenario.evidence[0].security.status = "QUARANTINED";
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("BLOCK");
+    expect(itemDecision(verdict, base.id).decision).toBe("BLOCK");
+    expect(itemDecision(verdict, dependent.id).decision).toBe("ALLOW");
+  });
+
+  it("requires order review when the core item is uncertain even if an accessory is allowed", async () => {
+    const scenario = dependencyPolicyScenario();
+    const [base, dependent] = scenario.proposedOrder.items;
+    dependent.compatibility = [];
+    scenario.evidence[0].evidence.claims = [{ kind: "feature", text: "No necessity is established." }];
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("REVIEW");
+    expect(itemDecision(verdict, base.id).decision).toBe("REVIEW");
+    expect(itemDecision(verdict, dependent.id).decision).toBe("ALLOW");
+  });
+
+  it("requires review rather than blocking an optional aggregator-only addition", async () => {
+    const scenario = workshopPolicyScenario();
+    const extra = scenario.proposedOrder.items[2];
+    scenario.evidence[3].evidence.source.sourceClass = "aggregator";
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("PARTIAL_ALLOW");
+    expect(itemDecision(verdict, extra.id).decision).toBe("REVIEW");
+    expect(itemDecision(verdict, extra.id).reasons.map((reason) => reason.code)).toContain(
+      "INSUFFICIENT_NECESSITY",
+    );
+  });
+
+  it("accepts compatibility evidence from either endpoint but rejects a third product", async () => {
+    const validScenario = dependencyPolicyScenario();
+    const [base] = validScenario.proposedOrder.items;
+    base.storeId = "base-store";
+    validScenario.evidence[0].evidence.source.storeId = "base-store";
+    validScenario.evidence[2].evidence.source.sourceClass = "aggregator";
+    validScenario.evidence[2].evidence.source.storeId = "base-store";
+
+    const validVerdict = await evaluate(validScenario);
+    expect(validVerdict.decision).toBe("ALLOW");
+
+    const invalidScenario = dependencyPolicyScenario();
+    const dependent = invalidScenario.proposedOrder.items[1];
+    invalidScenario.evidence[2].evidence.source.sourceClass = "aggregator";
+    invalidScenario.evidence[2].evidence.source.storeId = "unrelated-store";
+
+    const invalidVerdict = await evaluate(invalidScenario);
+    expect(itemDecision(invalidVerdict, dependent.id).decision).toBe("BLOCK");
+    expect(itemDecision(invalidVerdict, dependent.id).reasons.map((reason) => reason.code)).toContain(
+      "UNTRUSTED_EVIDENCE",
     );
   });
 });

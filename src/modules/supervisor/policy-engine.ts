@@ -17,7 +17,7 @@ import {
   type Verdict,
 } from "@/shared/contracts";
 
-export const POLICY_VERSION = "intentfence-supervisor-1.0.0";
+export const POLICY_VERSION = "intentfence-supervisor-1.1.0";
 
 const semanticFindingCodes = new Set<PolicyFinding["code"]>([
   "MANDATE_CONFLICT",
@@ -157,21 +157,21 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
     }
 
     const references = allEvidenceReferences(item);
-    const invalidReferences = references.filter((id) => {
-      const record = recordsById.get(id);
-      return !proposedOrder.evidenceIds.includes(id)
-        || !record
-        || record.security.captureId !== record.evidence.captureId
-        || (record.evidence.itemId !== undefined && record.evidence.itemId !== item.id)
-        || ((record.evidence.source.sourceClass === "seller"
-          || record.evidence.source.sourceClass === "aggregator")
-          && record.evidence.source.storeId !== item.storeId);
-    });
+    const invalidReferences = [
+      ...invalidEvidenceReferences(item.necessityEvidenceIds, item, proposedOrder, recordsById),
+      ...item.compatibility.flatMap((compatibility) => invalidEvidenceReferences(
+        compatibility.evidenceIds,
+        item,
+        proposedOrder,
+        recordsById,
+        compatibility.withItemId,
+      )),
+    ];
     if (invalidReferences.length > 0) {
       downgrade(target, "BLOCK", finding(
         "UNTRUSTED_EVIDENCE",
         "critical",
-        "An evidence reference, capture binding, or seller identity is inconsistent with trusted metadata.",
+        "An evidence reference, capture binding, or product identity is inconsistent with trusted metadata.",
         item.id,
         invalidReferences,
       ));
@@ -224,6 +224,7 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
         item,
         proposedOrder,
         recordsById,
+        compatibility.withItemId,
       );
       const incompatibilityEvidence = compatibilityRecords.filter((record) =>
         hasClaim(record.evidence, "incompatibility"),
@@ -257,28 +258,38 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
       const record = recordsById.get(id);
       return record && hasClaim(record.evidence, "necessity") ? [record] : [];
     });
-    const directlyRequested = isDirectlyRequested(mandate.goal, item)
-      || necessityRecords.some((record) => record.evidence.source.sourceClass === "user")
-      // Replay consumes the persisted mandate link directly. Live accepts it only
-      // when the independent semantic supervisor also allows the specific item.
+    const directlyRequested = necessityRecords.some((record) => record.evidence.source.sourceClass === "user")
+      || hasReplayDirectMandatePurpose(item.purpose)
       || ((input.semanticVerdict === undefined || semantic.decision === "ALLOW")
-        && hasReplayDirectMandatePurpose(item.purpose));
+        && isDirectlyRequested(mandate.goal, item));
     const independentNecessity = usableNecessity.some((record) =>
       isIndependentFromSeller(record, item, evidence),
     );
     const independentCompatibility = item.compatibility.some((compatibility) =>
-      usableEvidence(compatibility.evidenceIds, item, proposedOrder, recordsById)
+      usableEvidence(
+        compatibility.evidenceIds,
+        item,
+        proposedOrder,
+        recordsById,
+        compatibility.withItemId,
+      )
         .filter((record) => hasClaim(record.evidence, "compatibility"))
         .some((record) => isIndependentFromSeller(record, item, evidence)),
     );
     const sellerOnly = necessityRecords.length > 0
-      && !necessityRecords.some((record) => isIndependentFromSeller(record, item, evidence));
+      && necessityRecords.every((record) => record.evidence.source.sourceClass === "seller");
+    const unprovenNecessity = necessityRecords.length > 0
+      && !directlyRequested
+      && !independentNecessity
+      && !independentCompatibility;
 
-    if (sellerOnly && !directlyRequested && !independentNecessity && !independentCompatibility) {
-      downgrade(target, "BLOCK", finding(
-        "SELLER_ONLY_NECESSITY",
-        "critical",
-        "Seller-owned evidence alone cannot establish the necessity of an additional item.",
+    if (unprovenNecessity) {
+      downgrade(target, "REVIEW", finding(
+        sellerOnly ? "SELLER_ONLY_NECESSITY" : "INSUFFICIENT_NECESSITY",
+        "warning",
+        sellerOnly
+          ? "Seller-owned evidence alone cannot establish the necessity of an additional item."
+          : "The available evidence does not independently establish this additional item's necessity.",
         item.id,
         necessityRecords.map((record) => record.evidence.id),
       ));
@@ -308,6 +319,26 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
     itemDecisions.filter((item) => item.decision === "ALLOW").map((item) => item.itemId),
   );
   const hasBlocked = itemDecisions.some((item) => item.decision === "BLOCK");
+  const coreItems = proposedOrder.items.filter((item) => isMandateCoreItem(mandate, item));
+  const coreBlocked = coreItems.some((item) => decisions.get(item.id)?.decision === "BLOCK");
+  const coreReview = coreItems.some((item) => decisions.get(item.id)?.decision === "REVIEW");
+  const ungroundedPartial = coreItems.length === 0
+    && allowedIds.size > 0
+    && allowedIds.size < itemDecisions.length;
+  if (coreBlocked || coreReview) {
+    addGlobalFinding(finding(
+      "MANDATE_CONFLICT",
+      coreBlocked ? "critical" : "warning",
+      "An explicitly requested core item is not approvable, so an accessory-only or incomplete order cannot be paid automatically.",
+    ));
+  }
+  if (ungroundedPartial) {
+    addGlobalFinding(finding(
+      "INSUFFICIENT_NECESSITY",
+      "warning",
+      "No explicitly requested core item can be identified for the remaining partial order.",
+    ));
+  }
   const humanReviewRequired = hasExplicitHumanReviewConstraint(mandate);
   if (humanReviewRequired) {
     addGlobalFinding(finding(
@@ -316,11 +347,14 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
       "A hard mandate constraint requires human review or manual approval; automatic order creation is disabled.",
     ));
   }
-  // Item-level findings remain intact, while the order-level gate prevents every
-  // automatic approval path. Global critical integrity failures still stay BLOCK.
-  const decision = humanReviewRequired && globalBlockingFindings.length === 0
+  // A partial order is payable only while every identifiable core requirement survives.
+  const decision: Verdict["decision"] = humanReviewRequired && globalBlockingFindings.length === 0
     ? "REVIEW"
-    : aggregateDecision(itemDecisions, allowedIds);
+    : coreBlocked
+      ? "BLOCK"
+      : coreReview || ungroundedPartial
+        ? "REVIEW"
+        : aggregateDecision(itemDecisions, allowedIds);
   const allFindings = [...globalFindings];
   for (const itemDecision of itemDecisions) {
     for (const reason of itemDecision.reasons) addFinding(allFindings, reason);
@@ -380,7 +414,13 @@ function evaluateReplaySemantics(
       const supportedByDependency = item.compatibility.some((compatibility) => {
         if (compatibility.withItemId === null
           || result.get(compatibility.withItemId)?.decision !== "ALLOW") return false;
-        return usableEvidence(compatibility.evidenceIds, item, proposedOrder, recordsById)
+        return usableEvidence(
+          compatibility.evidenceIds,
+          item,
+          proposedOrder,
+          recordsById,
+          compatibility.withItemId,
+        )
           .filter((record) => hasClaim(record.evidence, "compatibility"))
           .some((record) => isIndependentFromSeller(record, item, evidence));
       });
@@ -396,24 +436,16 @@ function evaluateReplaySemantics(
     const current = result.get(item.id)!;
     if (current.decision === "ALLOW") continue;
     const necessity = necessityByItem.get(item.id) ?? [];
-    if (necessity.length > 0) {
-      current.decision = "BLOCK";
-      current.reasons = [finding(
-        "SELLER_ONLY_NECESSITY",
-        "critical",
-        "The evidence graph does not establish necessity independently of the seller.",
-        item.id,
-        necessity.map((record) => record.evidence.id),
-      )];
-    } else {
-      current.reasons = [finding(
-        "INSUFFICIENT_NECESSITY",
-        "warning",
-        "The mandate and trusted evidence do not establish item necessity.",
-        item.id,
-        item.necessityEvidenceIds,
-      )];
-    }
+    current.decision = "REVIEW";
+    current.reasons = [finding(
+      necessity.length > 0 && necessity.every((record) => record.evidence.source.sourceClass === "seller")
+        ? "SELLER_ONLY_NECESSITY"
+        : "INSUFFICIENT_NECESSITY",
+      "warning",
+      "The mandate and trusted evidence do not establish item necessity strongly enough for automatic purchase.",
+      item.id,
+      item.necessityEvidenceIds,
+    )];
   }
   return result;
 }
@@ -455,7 +487,7 @@ function mergeSemanticDecisions(
       proposedOrder,
       recordsById,
     ).filter((record) => hasClaim(record.evidence, "necessity"));
-    const directlyRequested = isDirectlyRequested(mandate.goal, item)
+    const directlyRequested = hasReplayDirectMandatePurpose(item.purpose)
       || cleanNecessity.some((record) => record.evidence.source.sourceClass === "user");
     const isContradictoryNecessityReview = semantic.decision === "REVIEW"
       && reasons.length > 0
@@ -536,19 +568,46 @@ function aggregateDecision(
   return itemDecisions.some((item) => item.decision === "BLOCK") ? "BLOCK" : "REVIEW";
 }
 
+function invalidEvidenceReferences(
+  ids: string[],
+  item: ProposedOrderItem,
+  proposedOrder: ProposedOrder,
+  recordsById: Map<string, EvidenceRecord>,
+  relatedItemId?: string | null,
+): string[] {
+  const relatedItem = proposedOrder.items.find((candidate) => candidate.id === relatedItemId);
+  return [...new Set(ids)].filter((id) => {
+    const record = recordsById.get(id);
+    if (!record
+      || !proposedOrder.evidenceIds.includes(id)
+      || record.security.captureId !== record.evidence.captureId
+      || record.evidence.itemId !== item.id) return true;
+    if (record.evidence.source.sourceClass === "seller"
+      || record.evidence.source.sourceClass === "aggregator") {
+      return record.evidence.source.storeId !== item.storeId
+        && record.evidence.source.storeId !== relatedItem?.storeId;
+    }
+    return false;
+  });
+}
+
 function usableEvidence(
   ids: string[],
   item: ProposedOrderItem,
   proposedOrder: ProposedOrder,
   recordsById: Map<string, EvidenceRecord>,
+  relatedItemId?: string | null,
 ): EvidenceRecord[] {
+  const invalid = new Set(invalidEvidenceReferences(
+    ids,
+    item,
+    proposedOrder,
+    recordsById,
+    relatedItemId,
+  ));
   return [...new Set(ids)].flatMap((id) => {
     const record = recordsById.get(id);
-    if (!record
-      || !proposedOrder.evidenceIds.includes(id)
-      || record.security.status !== "CLEAN"
-      || record.security.captureId !== record.evidence.captureId
-      || (record.evidence.itemId !== undefined && record.evidence.itemId !== item.id)) return [];
+    if (!record || invalid.has(id) || record.security.status !== "CLEAN") return [];
     return [record];
   });
 }
@@ -587,6 +646,10 @@ function hasReplayDirectMandatePurpose(purpose: string): boolean {
   // not an item name, category, or translation of any mandate wording.
   return /\b(?:explicitly|directly)\s+(?:requested|required)\b/i.test(normalized)
     || /\b(?:requested|required)\s+(?:by|in)\s+(?:the\s+)?(?:mandate|goal)\b/i.test(normalized);
+}
+
+export function isMandateCoreItem(mandate: Mandate, item: ProposedOrderItem): boolean {
+  return hasReplayDirectMandatePurpose(item.purpose) || isDirectlyRequested(mandate.goal, item);
 }
 
 function isDirectlyRequested(goal: string, item: ProposedOrderItem): boolean {

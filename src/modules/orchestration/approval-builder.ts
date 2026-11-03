@@ -7,6 +7,7 @@ import {
   type Verdict,
 } from "@/shared/contracts";
 import { canonicalJson, sha256 } from "@/server/canonical-json";
+import { isMandateCoreItem } from "@/modules/supervisor/policy-engine";
 
 export function buildApprovedOrder(
   mandate: Mandate,
@@ -35,6 +36,12 @@ export function buildApprovedOrder(
   const selected = proposal.items.filter((item) => allowedIds.has(item.id));
   if (selected.length === 0 || selected.length !== allowedIds.size) {
     throw new Error("APPROVAL_CONTEXT_INVALID");
+  }
+
+  const coreItems = proposal.items.filter((item) => isMandateCoreItem(mandate, item));
+  if ((verdict.decision === "PARTIAL_ALLOW" && coreItems.length === 0)
+    || coreItems.some((item) => !allowedIds.has(item.id))) {
+    throw new Error("ORDER_NOT_APPROVABLE");
   }
 
   for (const item of selected) {
