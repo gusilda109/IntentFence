@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     include: ["tests/{unit,integration,security}/**/*.test.ts"],
     environment: "node",
-    testTimeout: 45_000,
+    testTimeout: 20_000,
     hookTimeout: 20_000,
     env: {
       APP_MODE: "replay",

@@ -17,11 +17,21 @@ import type {
   PaymentSettlement,
 } from "../types";
 
+// SQLite has one writer. Serialize interactive transactions in-process so queued
+// BEGIN IMMEDIATE statements cannot occupy every Prisma worker and starve COMMIT.
+let transactionQueue: Promise<void> = Promise.resolve();
+
+function serializeTransaction<T>(operation: () => Promise<T>): Promise<T> {
+  const result = transactionQueue.then(operation, operation);
+  transactionQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 export class PrismaPaymentExecutionStore implements PaymentExecutionStore {
   constructor(private readonly prisma: PrismaClient = db) {}
 
   async acquire(order: ApprovedOrder, lease: PaymentLease): Promise<AcquirePaymentExecutionResult> {
-    return this.prisma.$transaction(async (tx) => {
+    return serializeTransaction(() => this.prisma.$transaction(async (tx) => {
       const run = await tx.run.findUnique({
         where: { approvedOrderId: order.id },
         include: { payment: true },
@@ -94,7 +104,7 @@ export class PrismaPaymentExecutionStore implements PaymentExecutionStore {
         leaseToken: execution.leaseToken,
         view: toPaymentView(execution),
       };
-    }, { maxWait: 20_000, timeout: 30_000 });
+    }, { maxWait: 10_000, timeout: 15_000 }));
   }
 
   async get(approvedOrderId: string): Promise<PaymentExecutionRecord | null> {
@@ -107,7 +117,7 @@ export class PrismaPaymentExecutionStore implements PaymentExecutionStore {
     leaseToken: string,
     settlement: PaymentSettlement,
   ): Promise<PaymentExecutionView> {
-    return this.prisma.$transaction(async (tx) => {
+    return serializeTransaction(() => this.prisma.$transaction(async (tx) => {
       const current = await tx.paymentExecution.findUnique({ where: { approvedOrderId } });
       if (!current) throw paymentError("PAYMENT_STATE_CONFLICT");
 
@@ -132,7 +142,7 @@ export class PrismaPaymentExecutionStore implements PaymentExecutionStore {
       await tx.run.update({ where: { id: current.runId }, data: { status: settlement.status } });
       const execution = await tx.paymentExecution.findUniqueOrThrow({ where: { id: current.id } });
       return toPaymentView(execution);
-    });
+    }));
   }
 }
 
