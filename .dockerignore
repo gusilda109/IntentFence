@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+.next
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+*.log
+coverage
+playwright-report
+test-results
+intentfence-pitch
+Dockerfile
+docker-compose.yml
+.DS_Store

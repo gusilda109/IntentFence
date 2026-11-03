@@ -1,0 +1,128 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [deploy]
+  workflow_dispatch:
+
+# Never run two deploys at once; a newer push waits for the running one.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+        env:
+          DATABASE_URL: file:./ci.db
+
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        # GHCR image names must be lowercase.
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "image=$repo:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "latest=$repo:latest" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ steps.meta.outputs.latest }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    env:
+      HOST: ${{ secrets.VPS_HOST }}
+      USER: ${{ secrets.VPS_USER }}
+      PORT: ${{ secrets.VPS_PORT || '22' }}
+      APP_DIR: ${{ vars.APP_DIR || 'intentfence' }}
+      IMAGE: ${{ needs.build.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: docker-compose.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$PORT" "$HOST" > ~/.ssh/known_hosts
+          fi
+          cat > ~/.ssh/config <<EOF
+          Host vps
+            HostName $HOST
+            User $USER
+            Port $PORT
+            IdentityFile ~/.ssh/id_deploy
+          EOF
+
+      - name: Upload compose file
+        run: |
+          ssh vps "mkdir -p '$APP_DIR'"
+          scp docker-compose.yml "vps:$APP_DIR/docker-compose.yml"
+
+      - name: Pull image and restart
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Token goes over stdin so it never appears in the server's process list.
+          printf '%s' "$GHCR_TOKEN" | ssh vps \
+            "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+          ssh vps "APP_DIR='$APP_DIR' IMAGE='$IMAGE' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$APP_DIR"
+          trap 'docker logout ghcr.io >/dev/null' EXIT
+          [ -f .env ] || { echo "Missing $APP_DIR/.env on the server" >&2; exit 1; }
+          export IMAGE
+          docker compose pull
+          docker compose up -d --remove-orphans --wait
+          docker image prune -f
+          echo "Deployed $IMAGE"
+          EOF
