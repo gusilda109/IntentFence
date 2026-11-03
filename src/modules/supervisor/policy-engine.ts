@@ -466,9 +466,12 @@ function mergeSemanticDecisions(
     // Keep every other semantic objection, including BLOCK and mandate conflicts.
     if (isContradictoryNecessityReview) continue;
 
+    const hasBlockingViolation = reasons.some((reason) => reason.severity === "critical"
+      && (reason.code === "MANDATE_CONFLICT" || reason.code === "INCOMPATIBLE"));
+    const semanticDecision = hasBlockingViolation ? "BLOCK" : semantic.decision;
     const decision = seen.has(semantic.itemId)
-      ? moreRestrictive(target.decision, semantic.decision)
-      : semantic.decision;
+      ? moreRestrictive(target.decision, semanticDecision)
+      : semanticDecision;
     const combinedReasons = seen.has(semantic.itemId)
       ? [...target.reasons, ...reasons]
       : reasons;

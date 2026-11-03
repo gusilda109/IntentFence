@@ -49,7 +49,9 @@ will independently enforce schema, references, source identity, quarantine,
 security, hashes, arithmetic, budget, coverage, and dependency closure. Never try
 to override those checks. Use only semantic finding codes: MANDATE_CONFLICT,
 INSUFFICIENT_NECESSITY, INSUFFICIENT_COMPATIBILITY, INCOMPATIBLE, or OTHER.
-Every BLOCK or REVIEW decision needs a reason.
+Every BLOCK or REVIEW decision needs a reason. A critical MANDATE_CONFLICT or
+INCOMPATIBLE finding means BLOCK, never REVIEW; reserve REVIEW for unresolved
+warnings that do not establish a direct violation.
 
 The envelope fields id, policyVersion, inputHash, and evaluatedAt are placeholders
 and will be replaced. Use UUID 00000000-0000-4000-8000-000000000000 for id,

@@ -151,7 +151,7 @@ describe("Supervisor replay policy", () => {
     expect(itemDecision(verdict, tv.id)).toMatchObject({ decision: "ALLOW", reasons: [] });
   });
 
-  it("preserves a semantic hard-constraint block for a bundled protection pack", async () => {
+  it("turns a critical hard-constraint conflict into BLOCK even when the model says REVIEW", async () => {
     const scenario = coffeePolicyScenario();
     const bundledTv = scenario.proposedOrder.items[0];
     const tvEvidence = scenario.evidence[0];
@@ -174,10 +174,10 @@ describe("Supervisor replay policy", () => {
       ...scenario,
       semanticVerdict: {
         ...baseline,
-        decision: "BLOCK",
+        decision: "REVIEW",
         itemDecisions: [{
           itemId: bundledTv.id,
-          decision: "BLOCK",
+          decision: "REVIEW",
           reasons: [{
             code: "MANDATE_CONFLICT",
             severity: "critical",
