@@ -44,6 +44,7 @@ describe("payment-free contracts and safe read models", () => {
       "id",
       "storeId",
       "productUrl",
+      "imageUrl",
       "name",
       "description",
       "quantity",

@@ -100,6 +100,50 @@ describe("Channel3 product mapping", () => {
     expect(toMinorUnits(10.001)).toBeNull();
   });
 
+  it("prefers the cleaned variant of the main product image", () => {
+    const mapped = normalizeProduct({
+      ...product,
+      images: [
+        { url: "https://cdn.example/first.jpg", is_main_image: false },
+        {
+          url: "https://cdn.example/main.jpg",
+          cleaned_url: "https://cdn.example/main-cleaned.webp",
+          is_main_image: true,
+          shot_type: "hero",
+          alt_text: "A black tablet",
+        },
+      ],
+    });
+
+    expect(mapped?.imageUrl).toBe("https://cdn.example/main-cleaned.webp");
+  });
+
+  it("falls back to the main image URL or the first available image", () => {
+    expect(normalizeProduct({
+      ...product,
+      images: [{ url: "https://cdn.example/main.jpg", is_main_image: true }],
+    })?.imageUrl).toBe("https://cdn.example/main.jpg");
+    expect(normalizeProduct({
+      ...product,
+      images: [{ url: "https://cdn.example/first.jpg" }],
+    })?.imageUrl).toBe("https://cdn.example/first.jpg");
+  });
+
+  it("omits missing or unsafe images and rejects an unsafe cleaned variant", () => {
+    expect(normalizeProduct(product)?.imageUrl).toBeUndefined();
+    expect(normalizeProduct({
+      ...product,
+      images: [{ url: "http://cdn.example/main.jpg", cleaned_url: "javascript:alert(1)" }],
+    })?.imageUrl).toBeUndefined();
+    expect(normalizeProduct({
+      ...product,
+      images: [{
+        url: "https://cdn.example/main.jpg",
+        cleaned_url: "https://user:password@cdn.example/cleaned.jpg",
+      }],
+    })?.imageUrl).toBe("https://cdn.example/main.jpg");
+  });
+
   it("rejects an unavailable selected variant even when a generic offer is in stock", () => {
     expect(normalizeProduct({
       ...product,

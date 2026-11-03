@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Mandate, ProposedOrder } from "@/shared/contracts";
 import type { CatalogProvider } from "@/modules/catalog/types";
 import type { ActorEvidenceSession } from "./session";
+import { attachCatalogImages } from "./catalog-images";
 import { validateProposedOrder } from "./validation";
 
 export async function runDeterministicChannel3Actor(
@@ -65,5 +66,5 @@ export async function runDeterministicChannel3Actor(
     isAllowedProductUrl: (storeId, url) => session.isRegisteredProductUrl(storeId, url),
   });
   await provider.validateSelection(proposal);
-  return proposal;
+  return attachCatalogImages(proposal, candidates);
 }

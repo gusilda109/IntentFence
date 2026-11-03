@@ -10,6 +10,14 @@ export const HashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export const IsoDateTimeSchema = z.string().regex(ISO_DATE_TIME_PATTERN);
 export const TextSchema = (max: number) => z.string().trim().min(1).max(max);
 const UrlSchema = z.string().max(2_048).refine((value) => URL.canParse(value), "Invalid URL");
+const HttpsUrlSchema = UrlSchema.refine((value) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}, "Invalid HTTPS URL");
 
 export const MoneySchema = z.object({
   currency: z.literal("USD"),
@@ -66,6 +74,7 @@ export const ProposedOrderItemSchema = z.object({
   id: IdSchema,
   storeId: TextSchema(100),
   productUrl: UrlSchema,
+  imageUrl: HttpsUrlSchema.optional(),
   name: TextSchema(120),
   description: TextSchema(1_000),
   quantity: z.number().int().min(1).max(20),

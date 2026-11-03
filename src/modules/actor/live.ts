@@ -14,6 +14,7 @@ import { listCatalog } from "@/modules/demo-stores";
 import { FixtureCatalogProvider } from "@/modules/catalog/fixtures";
 import type { CatalogProvider } from "@/modules/catalog/types";
 import type { ActorEvidenceSession } from "./session";
+import { attachCatalogImages } from "./catalog-images";
 import { validateProposedOrder } from "./validation";
 
 export const ACTOR_TOOL_NAMES = [
@@ -156,7 +157,7 @@ export async function runLiveActor(
     return materializeOrderDraft(mandate, session, result.finalOutput);
   });
   await provider.validateSelection(proposal);
-  return proposal;
+  return attachCatalogImages(proposal, candidates);
 }
 
 function materializeOrderDraft(
