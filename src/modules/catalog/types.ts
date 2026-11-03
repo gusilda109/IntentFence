@@ -9,6 +9,7 @@ export interface CatalogProductSnapshot {
   merchant: string;
   amountMinor: number;
   availability: "InStock";
+  imageUrl?: string;
   attributes: Record<string, string[]>;
   selectedVariant: Array<{ name: string; label: string }>;
 }

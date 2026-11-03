@@ -1,5 +1,6 @@
 import type { ItemDecision, RunView } from "@/shared/contracts";
 import { BoxIcon, ExternalLinkIcon } from "@/components/icons";
+import { ProductImage } from "@/components/product-image";
 import { SectionPanel } from "@/components/section-panel";
 import { StatusBadge, type BadgeTone } from "@/components/status-badge";
 import { formatMoney } from "@/components/format";
@@ -38,28 +39,33 @@ export function OrderItems({ run }: { run: RunView }) {
                 <li key={item.id}>
                   <article className="item-card" id={`item-${item.id}`}>
                     <div className="item-card-main">
-                      <div className="item-card-top">
-                        <div>
-                          <h3>{item.name}</h3>
-                          <p className="item-store">{item.storeId} · Quantity {item.quantity}</p>
+                      <div className={item.imageUrl ? "item-card-layout" : undefined}>
+                        {item.imageUrl ? <ProductImage src={item.imageUrl} alt={item.name} /> : null}
+                        <div className="item-card-content">
+                          <div className="item-card-top">
+                            <div>
+                              <h3>{item.name}</h3>
+                              <p className="item-store">{item.storeId} · Quantity {item.quantity}</p>
+                            </div>
+                            <div className="item-price">
+                              <strong>{formatMoney(lineTotal)}</strong>
+                              <span>{formatMoney(item.unitPrice)} each</span>
+                            </div>
+                          </div>
+                          <p className="item-purpose">{item.purpose}</p>
+                          <p className="item-description">{item.description}</p>
+                          <div className="item-meta">
+                            <a href={item.productUrl} target="_blank" rel="noreferrer">
+                              View product source <ExternalLinkIcon />
+                            </a>
+                          </div>
+                          <div className="item-decision-row">
+                            <span className="item-decision-label">Policy decision</span>
+                            <StatusBadge tone={itemDecision ? decisionTones[itemDecision.decision] : "neutral"} dot>
+                              {itemDecision?.decision ?? "PENDING"}
+                            </StatusBadge>
+                          </div>
                         </div>
-                        <div className="item-price">
-                          <strong>{formatMoney(lineTotal)}</strong>
-                          <span>{formatMoney(item.unitPrice)} each</span>
-                        </div>
-                      </div>
-                      <p className="item-purpose">{item.purpose}</p>
-                      <p className="item-description">{item.description}</p>
-                      <div className="item-meta">
-                        <a href={item.productUrl} target="_blank" rel="noreferrer">
-                          View product source <ExternalLinkIcon />
-                        </a>
-                      </div>
-                      <div className="item-decision-row">
-                        <span className="item-decision-label">Policy decision</span>
-                        <StatusBadge tone={itemDecision ? decisionTones[itemDecision.decision] : "neutral"} dot>
-                          {itemDecision?.decision ?? "PENDING"}
-                        </StatusBadge>
                       </div>
                     </div>
                     {itemDecision && itemDecision.reasons.length > 0 ? (

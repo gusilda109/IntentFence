@@ -35,6 +35,14 @@ const VariantSchema = z.object({
   })).max(50),
 });
 
+const ProductImageSchema = z.object({
+  url: z.string().max(2_048),
+  cleaned_url: z.string().max(2_048).nullish(),
+  is_main_image: z.boolean().nullish(),
+  shot_type: z.string().max(100).nullish(),
+  alt_text: z.string().max(2_000).nullish(),
+});
+
 export const Channel3ProductSchema = z.object({
   id: z.string().min(1).max(500),
   title: z.string().min(1).max(2_000),
@@ -44,6 +52,7 @@ export const Channel3ProductSchema = z.object({
   offers: z.array(OfferSchema).max(200).optional(),
   variants: VariantSchema.nullish(),
   structured_attributes: z.record(z.string().max(200), z.array(z.string().max(1_000)).max(100)).optional(),
+  images: z.array(ProductImageSchema).max(100).nullish(),
 });
 
 export const Channel3SearchResponseSchema = z.object({

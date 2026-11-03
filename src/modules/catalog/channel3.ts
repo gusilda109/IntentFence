@@ -63,6 +63,7 @@ export class Channel3CatalogProvider implements CatalogProvider {
 
 export function normalizeProduct(product: Channel3Product): CatalogProductSnapshot | null {
   if (!hasAvailableSelectedVariant(product)) return null;
+  const imageUrl = selectProductImageUrl(product.images);
   const offers = (product.offers ?? []).flatMap((offer) => {
     if (offer.availability !== "InStock" || offer.price.currency !== "USD") return [];
     const amountMinor = toMinorUnits(offer.price.price);
@@ -75,6 +76,7 @@ export function normalizeProduct(product: Channel3Product): CatalogProductSnapsh
       merchant: offer.domain,
       amountMinor,
       availability: "InStock" as const,
+      ...(imageUrl ? { imageUrl } : {}),
       attributes: product.structured_attributes ?? {},
       selectedVariant: product.variants?.selected ?? [],
     }];
@@ -83,6 +85,13 @@ export function normalizeProduct(product: Channel3Product): CatalogProductSnapsh
     || left.merchant.localeCompare(right.merchant)
     || left.productUrl.localeCompare(right.productUrl));
   return offers[0] ?? null;
+}
+
+function selectProductImageUrl(images: Channel3Product["images"]): string | undefined {
+  const image = images?.find((candidate) => candidate.is_main_image) ?? images?.[0];
+  if (!image) return undefined;
+  if (image.cleaned_url && isHttpsUrl(image.cleaned_url)) return image.cleaned_url;
+  return image.url && isHttpsUrl(image.url) ? image.url : undefined;
 }
 
 function hasAvailableSelectedVariant(product: Channel3Product): boolean {
