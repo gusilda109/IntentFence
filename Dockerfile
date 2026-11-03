@@ -15,7 +15,7 @@ RUN npm run build
 
 FROM base AS runtime
 ENV NODE_ENV=production \
-    PORT=3000 \
+    PORT=3058 \
     DATABASE_URL=file:/data/intentfence.db
 # Full node_modules is kept on purpose: the Prisma CLI (a devDependency)
 # runs the migrations on every container start.
@@ -23,5 +23,5 @@ COPY --from=build --chown=node:node /app /app
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME /data
-EXPOSE 3000
+EXPOSE 3058
 CMD ["sh", "-c", "npx prisma migrate deploy && exec npx next start -H 0.0.0.0 -p \"$PORT\""]
