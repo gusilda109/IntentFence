@@ -7,7 +7,9 @@ services:
       # SQLite lives on the named volume so it survives redeploys.
       DATABASE_URL: file:/data/intentfence.db
     ports:
-      - "${APP_PORT:-3000}:3000"
+      # Loopback only: nginx on the host proxies to it, and Docker's iptables
+      # rules would otherwise expose the port publicly past ufw.
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:
       - data:/data
     healthcheck:
