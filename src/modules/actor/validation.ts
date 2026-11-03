@@ -88,18 +88,47 @@ export function validateProposedOrder(
 
   for (const item of proposal.items) {
     for (const evidenceId of item.necessityEvidenceIds) {
-      requireInvariant(recordsById.has(evidenceId), `Unknown necessity evidence ID: ${evidenceId}`);
+      const record = recordsById.get(evidenceId);
+      requireInvariant(record, `Unknown necessity evidence ID: ${evidenceId}`);
       requireInvariant(listedEvidenceIds.has(evidenceId), `Necessity evidence ${evidenceId} is missing from proposal.evidenceIds`);
+      requireInvariant(record.evidence.itemId === item.id, `Necessity evidence ${evidenceId} belongs to another item`);
+      if (["seller", "aggregator"].includes(record.evidence.source.sourceClass)) {
+        requireInvariant(
+          record.evidence.source.storeId === item.storeId,
+          `Necessity evidence ${evidenceId} comes from another product`,
+        );
+      }
     }
+    requireInvariant(
+      item.necessityEvidenceIds.some((evidenceId) => recordsById.get(evidenceId)
+        ?.evidence.claims.some((claim) => claim.kind === "necessity")),
+      `Item ${item.id} has no necessity claim`,
+    );
     for (const compatibility of item.compatibility) {
       requireInvariant(
         compatibility.withItemId === null || itemIds.has(compatibility.withItemId),
         `Compatibility claim references an unknown item for ${item.id}`,
       );
+      requireInvariant(compatibility.withItemId !== item.id, `Item ${item.id} cannot depend on itself`);
+      const dependency = proposal.items.find((candidate) => candidate.id === compatibility.withItemId);
       for (const evidenceId of compatibility.evidenceIds) {
-        requireInvariant(recordsById.has(evidenceId), `Unknown compatibility evidence ID: ${evidenceId}`);
+        const record = recordsById.get(evidenceId);
+        requireInvariant(record, `Unknown compatibility evidence ID: ${evidenceId}`);
         requireInvariant(listedEvidenceIds.has(evidenceId), `Compatibility evidence ${evidenceId} is missing from proposal.evidenceIds`);
+        requireInvariant(record.evidence.itemId === item.id, `Compatibility evidence ${evidenceId} belongs to another item`);
+        if (["seller", "aggregator"].includes(record.evidence.source.sourceClass)) {
+          requireInvariant(
+            record.evidence.source.storeId === item.storeId
+              || record.evidence.source.storeId === dependency?.storeId,
+            `Compatibility evidence ${evidenceId} comes from an unrelated product`,
+          );
+        }
       }
+      requireInvariant(
+        compatibility.evidenceIds.some((evidenceId) => recordsById.get(evidenceId)
+          ?.evidence.claims.some((claim) => claim.kind === "compatibility" || claim.kind === "incompatibility")),
+        `Compatibility requirement ${item.id} has no compatibility claim`,
+      );
     }
   }
 

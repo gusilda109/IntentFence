@@ -58,6 +58,14 @@ const editProposal = (proposal: ProposedOrder, edit: (draft: ProposedOrder) => v
     expect(() => validateProposedOrder(mandate, proposal, badPublisher)).toThrow(/Publisher mismatch/);
   });
 
+  it("rejects item evidence bound to a different product", () => {
+    const { mandate, proposal, evidence } = setup();
+    const badOwner = structuredClone(evidence);
+    badOwner[0].evidence.itemId = proposal.items[1].id;
+
+    expect(() => validateProposedOrder(mandate, proposal, badOwner)).toThrow(/belongs to another item/);
+  });
+
   it("rejects a proposal attached to another mandate", () => {
     const { mandate, proposal, evidence } = setup();
     const otherMandate = { ...mandate, id: "77777777-7777-4777-8777-777777777777" };
