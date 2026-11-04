@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import { sha256 } from "@/server/canonical-json";
 import { VerdictSchema, type Verdict } from "@/shared/contracts";
 import { createSupervisor } from "@/modules/supervisor";
-import { evaluatePolicy, computeSupervisorInputHash } from "@/modules/supervisor/policy-engine";
+import {
+  evaluatePolicy,
+  computeSupervisorInputHash,
+  isMandateCoreItem,
+} from "@/modules/supervisor/policy-engine";
 import {
   coffeePolicyScenario,
   dependencyPolicyScenario,
@@ -40,6 +44,113 @@ describe("Supervisor replay policy", () => {
     expect(itemDecision(verdict, upsell.id).reasons.map((reason) => reason.code)).toEqual(
       expect.arrayContaining(["SELLER_ONLY_NECESSITY", "PROMPT_INJECTION"]),
     );
+  });
+
+  it("retains the affordable core coffee subset when the proposal exceeds budget", async () => {
+    const scenario = coffeePolicyScenario();
+    scenario.mandate.budget.amountMinor = 45_000;
+    const [tablet, printer, adapter, upsell] = scenario.proposedOrder.items;
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("PARTIAL_ALLOW");
+    expect(itemDecision(verdict, tablet.id).decision).toBe("ALLOW");
+    expect(itemDecision(verdict, printer.id).decision).toBe("ALLOW");
+    expect(itemDecision(verdict, adapter.id).decision).toBe("ALLOW");
+    expect(itemDecision(verdict, upsell.id).decision).toBe("BLOCK");
+    expect(verdict.findings.map((finding) => finding.code)).toContain("BUDGET_EXCEEDED");
+    const retainedTotal = scenario.proposedOrder.items
+      .filter((item) => itemDecision(verdict, item.id).decision === "ALLOW")
+      .reduce((sum, item) => sum + item.unitPrice.amountMinor * item.quantity, 0);
+    expect(retainedTotal).toBe(41_000);
+  });
+
+  it("excludes an over-budget dependency while retaining an affordable core-only subset", async () => {
+    const scenario = dependencyPolicyScenario();
+    scenario.mandate.budget.amountMinor = 18_000;
+    const [base, dependent] = scenario.proposedOrder.items;
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("PARTIAL_ALLOW");
+    expect(itemDecision(verdict, base.id).decision).toBe("ALLOW");
+    expect(itemDecision(verdict, dependent.id).decision).toBe("REVIEW");
+    expect(itemDecision(verdict, dependent.id).reasons).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "BUDGET_EXCEEDED",
+        severity: "warning",
+        message: expect.stringContaining("excluded from the payable subset"),
+      }),
+    ]));
+  });
+
+  it("does not retain an incomplete budget-feasible subset when every item is core", async () => {
+    const scenario = dependencyPolicyScenario();
+    const [base, dependent] = scenario.proposedOrder.items;
+    scenario.mandate.goal = "Set up a base console and sensor module for field work";
+    base.purpose = "Base console explicitly requested by the mandate for field work";
+    dependent.purpose = "Sensor module explicitly requested by the mandate for field work";
+
+    expect(scenario.proposedOrder.items.every((item) =>
+      isMandateCoreItem(scenario.mandate, item))).toBe(true);
+    const baseline = await evaluate(scenario);
+    expect(baseline.decision).toBe("ALLOW");
+    expect(baseline.itemDecisions.every((item) => item.decision === "ALLOW")).toBe(true);
+    expect(base.unitPrice.amountMinor * base.quantity).toBeLessThan(18_000);
+    expect(scenario.proposedOrder.total.amountMinor).toBeGreaterThan(18_000);
+
+    scenario.mandate.budget.amountMinor = 18_000;
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("BLOCK");
+    expect(verdict.itemDecisions.every((item) => item.decision === "BLOCK")).toBe(true);
+    for (const item of scenario.proposedOrder.items) {
+      expect(itemDecision(verdict, item.id).reasons).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: "BUDGET_EXCEEDED", severity: "critical" }),
+      ]));
+    }
+    expect(itemDecision(verdict, dependent.id).reasons.map((reason) => reason.code)).not.toContain(
+      "UNMET_DEPENDENCY",
+    );
+  });
+
+  it("blocks every baseline ALLOW item when no all-core budget-feasible subset exists", async () => {
+    const scenario = dependencyPolicyScenario();
+    scenario.mandate.budget.amountMinor = 14_000;
+    const [base] = scenario.proposedOrder.items;
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("BLOCK");
+    expect(verdict.itemDecisions.every((item) => item.decision === "BLOCK")).toBe(true);
+    expect(itemDecision(verdict, base.id).reasons).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "BUDGET_EXCEEDED", severity: "critical" }),
+    ]));
+  });
+
+  it("allows the complete dependency graph at the exact budget", async () => {
+    const scenario = dependencyPolicyScenario();
+    scenario.mandate.budget.amountMinor = 21_000;
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("ALLOW");
+    expect(verdict.itemDecisions.every((item) => item.decision === "ALLOW")).toBe(true);
+  });
+
+  it("keeps invalid arithmetic fail-closed when the order is also over budget", async () => {
+    const scenario = dependencyPolicyScenario();
+    scenario.mandate.budget.amountMinor = 1_000;
+    scenario.proposedOrder.total.amountMinor += 1;
+
+    const verdict = await evaluate(scenario);
+
+    expect(verdict.decision).toBe("BLOCK");
+    expect(verdict.itemDecisions.every((item) => item.decision === "BLOCK")).toBe(true);
+    expect(verdict.findings.map((finding) => finding.code)).toEqual(expect.arrayContaining([
+      "INVALID_ARITHMETIC",
+      "BUDGET_EXCEEDED",
+    ]));
   });
 
   it("uses the persisted replay purpose for the required Russian coffee goal", async () => {

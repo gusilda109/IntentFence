@@ -46,6 +46,7 @@ const ProductImageSchema = z.object({
 export const Channel3ProductSchema = z.object({
   id: z.string().min(1).max(500),
   title: z.string().min(1).max(2_000),
+  category: z.object({ slug: z.string().min(1).max(500) }).nullish(),
   description: z.string().max(20_000).nullish(),
   brands: z.array(z.object({ id: z.string().max(500), name: z.string().max(500) })).max(20).optional(),
   key_features: z.array(z.string().max(2_000)).max(100).nullish(),
@@ -123,7 +124,7 @@ export class Channel3Client {
       method: "POST",
       body: JSON.stringify({
         query: goal,
-        limit: 6,
+        limit: 20,
         config: { country: "US", currency: "USD", language: "en", mode: "agentic" },
         filters: {
           availability: ["InStock"],

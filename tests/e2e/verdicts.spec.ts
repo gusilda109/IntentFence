@@ -38,6 +38,45 @@ test("an over-budget coffee run is BLOCK and cannot reach payment execution", as
   });
 });
 
+test("an over-budget coffee replay pays only the exact-budget equipment subset", async ({
+  request,
+}) => {
+  const run = await createRun(request, coffeeInput({ budget: 55_700 }));
+
+  expect(run.replay).toBe(true);
+  expect(run.status).toBe("PAYPAL_CREATED");
+  expect(run.verdict?.decision).toBe("PARTIAL_ALLOW");
+  expect(run.proposedOrder?.total.amountMinor).toBe(65_600);
+  expect(run.approvedOrder?.total.amountMinor).toBe(55_700);
+  expect(run.payment?.status).toBe("PAYPAL_CREATED");
+
+  const proposedItems = run.proposedOrder!.items;
+  const itemDecisions = run.verdict!.itemDecisions;
+  const decisionByItem = new Map(itemDecisions.map((decision) => [decision.itemId, decision]));
+  const allowedItems = proposedItems.filter((item) =>
+    decisionByItem.get(item.id)?.decision === "ALLOW");
+  expect(allowedItems.map((item) => item.name)).toEqual(expect.arrayContaining([
+    "HubTab S10",
+    "RP-80 Thermal Receipt Printer",
+    "LinkBridge USB-C Receipt Adapter",
+  ]));
+  expect(allowedItems).toHaveLength(3);
+
+  const license = proposedItems.find((item) => item.name === "Calibration License");
+  expect(license).toBeDefined();
+  const licenseDecision = decisionByItem.get(license!.id);
+  expect(licenseDecision?.decision).toBe("BLOCK");
+  expect(licenseDecision?.reasons.map((reason) => reason.code)).toEqual(expect.arrayContaining([
+    "SELLER_ONLY_NECESSITY",
+    "PROMPT_INJECTION",
+  ]));
+  expect(run.approvedOrder!.items.map((item) => item.sourceItemId).sort()).toEqual(
+    allowedItems.map((item) => item.id).sort(),
+  );
+  expect(run.verdict!.findings.some((finding) =>
+    finding.code === "BUDGET_EXCEEDED" && finding.itemId === undefined)).toBe(true);
+});
+
 test("a hard human-review constraint yields REVIEW and prevents automatic payment", async ({
   page,
   request,

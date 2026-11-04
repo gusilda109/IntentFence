@@ -51,6 +51,22 @@ describe("Channel3 client contracts", () => {
     expect(String(fetchMock.mock.calls[1][0])).toContain("currency=USD");
   });
 
+  it("requests 20 results and parses present, null, and missing categories", async () => {
+    const categorized = { ...product, category: { slug: "tablets" } };
+    const uncategorized = { ...product, id: "product-2", category: null };
+    const withoutCategory = { ...product, id: "product-3" };
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+      products: [categorized, uncategorized, withoutCategory],
+      next_page_token: null,
+    }));
+    const client = new Channel3Client({ apiKey: "key", fetch: fetchMock, maxRetries: 0 });
+
+    const results = await client.search("tablet", 80_000);
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({ limit: 20 });
+    expect(results.map((result) => result.category)).toEqual([{ slug: "tablets" }, null, undefined]);
+  });
+
   it("rejects missing configuration without making a request", () => {
     const fetchMock = vi.fn<typeof fetch>();
     expect(() => new Channel3Client({ apiKey: "", fetch: fetchMock })).toThrowError(Channel3Error);

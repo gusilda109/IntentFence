@@ -78,6 +78,8 @@ describe("live Actor provider compatibility", () => {
     expect(sdk.agentOptions).toHaveLength(1);
     expect(sdk.agentOptions[0]).toHaveProperty("outputType");
     expect(sdk.agentOptions[0]?.tools).toEqual([]);
+    expect(sdk.agentOptions[0]?.instructions).toContain("select one best-fit candidate per requested category");
+    expect(sdk.agentOptions[0]?.instructions).toContain("never silently omit one category or drop it merely to fit the budget");
     expect(sdk.run).toHaveBeenCalledTimes(1);
   });
 });

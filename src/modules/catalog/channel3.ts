@@ -7,7 +7,7 @@ import { Channel3Client, Channel3Error, type Channel3Product } from "./channel3-
 import type { CatalogCandidate, CatalogProductSnapshot, CatalogProvider } from "./types";
 
 const PUBLISHER_ID = "channel3-aggregator";
-const MAX_CANDIDATES = 4;
+const MAX_CANDIDATES = 12;
 
 export class Channel3CatalogProvider implements CatalogProvider {
   readonly source = "channel3" as const;
@@ -17,9 +17,11 @@ export class Channel3CatalogProvider implements CatalogProvider {
 
   async discover(mandate: Mandate): Promise<CatalogCandidate[]> {
     const searchResults = await this.client.search(mandate.goal, mandate.budget.amountMinor);
+    const products: CatalogProductSnapshot[] = [];
     const candidates: CatalogCandidate[] = [];
 
-    for (const result of searchResults.slice(0, MAX_CANDIDATES)) {
+    for (const result of prioritizeSearchResults(searchResults)) {
+      if (candidates.length === MAX_CANDIDATES) break;
       let detail: Channel3Product;
       try {
         detail = await this.client.getProduct(result.id);
@@ -28,8 +30,9 @@ export class Channel3CatalogProvider implements CatalogProvider {
         throw error;
       }
       const product = normalizeProduct(detail);
-      if (!product) continue;
+      if (!product || products.some((candidate) => sameProductUrl(candidate.productUrl, product.productUrl))) continue;
       this.discovered.set(product.productUrl, product);
+      products.push(product);
       candidates.push(toCandidate(product));
     }
 
@@ -59,6 +62,30 @@ export class Channel3CatalogProvider implements CatalogProvider {
       }
     }
   }
+}
+
+function prioritizeSearchResults(searchResults: Channel3Product[]): Channel3Product[] {
+  const uniqueById = new Map<string, Channel3Product>();
+  for (const result of searchResults) {
+    if (!uniqueById.has(result.id)) uniqueById.set(result.id, result);
+  }
+
+  const groups = new Map<string | null, Channel3Product[]>();
+  for (const result of uniqueById.values()) {
+    const category = result.category?.slug ?? null;
+    const group = groups.get(category);
+    if (group) group.push(result);
+    else groups.set(category, [result]);
+  }
+
+  const prioritized: Channel3Product[] = [];
+  for (let index = 0; prioritized.length < uniqueById.size; index += 1) {
+    for (const group of groups.values()) {
+      const result = group[index];
+      if (result) prioritized.push(result);
+    }
+  }
+  return prioritized;
 }
 
 export function normalizeProduct(product: Channel3Product): CatalogProductSnapshot | null {

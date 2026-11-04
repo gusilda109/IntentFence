@@ -17,7 +17,7 @@ import {
   type Verdict,
 } from "@/shared/contracts";
 
-export const POLICY_VERSION = "intentfence-supervisor-1.1.0";
+export const POLICY_VERSION = "intentfence-supervisor-1.2.0";
 
 const semanticFindingCodes = new Set<PolicyFinding["code"]>([
   "MANDATE_CONFLICT",
@@ -107,7 +107,7 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
       "BUDGET_EXCEEDED",
       "critical",
       "The proposed total exceeds the mandate budget.",
-    ), true);
+    ));
   }
 
   if (new Set(proposedOrder.evidenceIds).size !== proposedOrder.evidenceIds.length) {
@@ -298,6 +298,10 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
 
   enforceDependencyClosure(proposedOrder, decisions);
 
+  const budgetSelectionFailed = proposedOrder.total.amountMinor > mandate.budget.amountMinor
+    && globalBlockingFindings.length === 0
+    && applyBudgetSelection(mandate, proposedOrder, decisions);
+
   const itemDecisions: ItemDecision[] = proposedOrder.items.map((item) => {
     const decision = decisions.get(item.id)!;
     if (decision.decision !== "ALLOW" && decision.reasons.length === 0) {
@@ -348,13 +352,15 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
     ));
   }
   // A partial order is payable only while every identifiable core requirement survives.
-  const decision: Verdict["decision"] = humanReviewRequired && globalBlockingFindings.length === 0
-    ? "REVIEW"
-    : coreBlocked
-      ? "BLOCK"
-      : coreReview || ungroundedPartial
-        ? "REVIEW"
-        : aggregateDecision(itemDecisions, allowedIds);
+  const decision: Verdict["decision"] = budgetSelectionFailed
+    ? "BLOCK"
+    : humanReviewRequired && globalBlockingFindings.length === 0
+      ? "REVIEW"
+      : coreBlocked
+        ? "BLOCK"
+        : coreReview || ungroundedPartial
+          ? "REVIEW"
+          : aggregateDecision(itemDecisions, allowedIds);
   const allFindings = [...globalFindings];
   for (const itemDecision of itemDecisions) {
     for (const reason of itemDecision.reasons) addFinding(allFindings, reason);
@@ -557,6 +563,200 @@ function enforceDependencyClosure(
       }
     }
   }
+}
+
+interface BudgetCandidate {
+  item: ProposedOrderItem;
+  originalIndex: number;
+  cost: number;
+  core: boolean;
+}
+
+interface BudgetSubset {
+  indices: number[];
+  total: number;
+}
+
+function applyBudgetSelection(
+  mandate: Mandate,
+  proposedOrder: ProposedOrder,
+  decisions: Map<string, MutableDecision>,
+): boolean {
+  const coreItems = proposedOrder.items.filter((item) => isMandateCoreItem(mandate, item));
+  if (coreItems.some((item) => decisions.get(item.id)?.decision !== "ALLOW")) return false;
+
+  const candidates = proposedOrder.items.flatMap((item, originalIndex) =>
+    decisions.get(item.id)?.decision === "ALLOW" ? [{
+      item,
+      originalIndex,
+      cost: item.unitPrice.amountMinor * item.quantity,
+      core: isMandateCoreItem(mandate, item),
+    }] : [],
+  );
+  if (candidates.length === 0) return false;
+
+  const retainedTotal = candidates.reduce((sum, candidate) => sum + candidate.cost, 0);
+  if (retainedTotal <= mandate.budget.amountMinor) return false;
+
+  const subset = selectBudgetSubset(candidates, mandate.budget.amountMinor);
+  if (!subset) {
+    for (const candidate of candidates) {
+      downgrade(decisions.get(candidate.item.id)!, "BLOCK", finding(
+        "BUDGET_EXCEEDED",
+        "critical",
+        "No budget-feasible payable subset can retain every identifiable core item with its required dependencies.",
+        candidate.item.id,
+      ));
+    }
+    return true;
+  }
+
+  const retainedIndices = new Set(subset.indices);
+  for (const candidate of candidates) {
+    if (retainedIndices.has(candidate.originalIndex)) continue;
+    downgrade(decisions.get(candidate.item.id)!, "REVIEW", finding(
+      "BUDGET_EXCEEDED",
+      "warning",
+      "The item is excluded from the payable subset to keep the retained total within the mandate budget.",
+      candidate.item.id,
+    ));
+  }
+  return false;
+}
+
+function selectBudgetSubset(
+  candidates: BudgetCandidate[],
+  budget: number,
+): BudgetSubset | null {
+  return candidates.length <= 20
+    ? selectExactBudgetSubset(candidates, budget)
+    : selectGreedyBudgetSubset(candidates, budget);
+}
+
+function selectExactBudgetSubset(
+  candidates: BudgetCandidate[],
+  budget: number,
+): BudgetSubset | null {
+  const positionsById = new Map(candidates.map((candidate, position) => [candidate.item.id, position]));
+  const selected = candidates.map(() => false);
+  let best: BudgetSubset | null = null;
+
+  const visit = (position: number, total: number, count: number): void => {
+    if (total > budget) return;
+    if (best && count + candidates.length - position < best.indices.length) return;
+    if (position === candidates.length) {
+      if (count === 0) return;
+      for (let candidatePosition = 0; candidatePosition < candidates.length; candidatePosition += 1) {
+        if (!selected[candidatePosition]) continue;
+        const closed = candidates[candidatePosition].item.compatibility.every((compatibility) => {
+          if (compatibility.withItemId === null) return true;
+          const dependencyPosition = positionsById.get(compatibility.withItemId);
+          return dependencyPosition !== undefined && selected[dependencyPosition];
+        });
+        if (!closed) return;
+      }
+      const candidateSubset = {
+        indices: candidates.flatMap((candidate, candidatePosition) =>
+          selected[candidatePosition] ? [candidate.originalIndex] : []),
+        total,
+      };
+      if (!best || isBetterBudgetSubset(candidateSubset, best)) best = candidateSubset;
+      return;
+    }
+
+    const candidate = candidates[position];
+    const dependencyAlreadyExcluded = candidate.item.compatibility.some((compatibility) => {
+      if (compatibility.withItemId === null) return false;
+      const dependencyPosition = positionsById.get(compatibility.withItemId);
+      return dependencyPosition !== undefined
+        && dependencyPosition < position
+        && !selected[dependencyPosition];
+    });
+    if (!dependencyAlreadyExcluded && total + candidate.cost <= budget) {
+      selected[position] = true;
+      visit(position + 1, total + candidate.cost, count + 1);
+      selected[position] = false;
+    }
+
+    if (candidate.core) return;
+    const requiredBySelected = candidates.some((other, otherPosition) =>
+      otherPosition < position
+      && selected[otherPosition]
+      && other.item.compatibility.some((compatibility) =>
+        compatibility.withItemId === candidate.item.id),
+    );
+    if (!requiredBySelected) visit(position + 1, total, count);
+  };
+
+  visit(0, 0, 0);
+  return best;
+}
+
+function isBetterBudgetSubset(candidate: BudgetSubset, current: BudgetSubset): boolean {
+  if (candidate.indices.length !== current.indices.length) {
+    return candidate.indices.length > current.indices.length;
+  }
+  if (candidate.total !== current.total) return candidate.total > current.total;
+  for (let index = 0; index < candidate.indices.length; index += 1) {
+    if (candidate.indices[index] !== current.indices[index]) {
+      return candidate.indices[index] < current.indices[index];
+    }
+  }
+  return false;
+}
+
+function selectGreedyBudgetSubset(
+  candidates: BudgetCandidate[],
+  budget: number,
+): BudgetSubset | null {
+  const positionsById = new Map(candidates.map((candidate, position) => [candidate.item.id, position]));
+  const closures = candidates.map((_, position) =>
+    budgetDependencyClosure(position, candidates, positionsById));
+  const selected = new Set<number>();
+  let total = 0;
+
+  const addWithDependencies = (position: number): boolean => {
+    const closure = closures[position];
+    if (!closure) return false;
+    const additions = closure.filter((dependencyPosition) => !selected.has(dependencyPosition));
+    const nextTotal = total + additions.reduce((sum, dependencyPosition) =>
+      sum + candidates[dependencyPosition].cost, 0);
+    if (nextTotal > budget) return false;
+    for (const dependencyPosition of additions) selected.add(dependencyPosition);
+    total = nextTotal;
+    return true;
+  };
+
+  for (let position = 0; position < candidates.length; position += 1) {
+    if (candidates[position].core && !addWithDependencies(position)) return null;
+  }
+  for (let position = 0; position < candidates.length; position += 1) {
+    if (!selected.has(position)) addWithDependencies(position);
+  }
+  if (selected.size === 0) return null;
+  return {
+    indices: [...selected].map((position) => candidates[position].originalIndex).sort((a, b) => a - b),
+    total,
+  };
+}
+
+function budgetDependencyClosure(
+  position: number,
+  candidates: BudgetCandidate[],
+  positionsById: Map<string, number>,
+): number[] | null {
+  const closure = new Set<number>();
+  const visit = (currentPosition: number): boolean => {
+    if (closure.has(currentPosition)) return true;
+    closure.add(currentPosition);
+    for (const compatibility of candidates[currentPosition].item.compatibility) {
+      if (compatibility.withItemId === null) continue;
+      const dependencyPosition = positionsById.get(compatibility.withItemId);
+      if (dependencyPosition === undefined || !visit(dependencyPosition)) return false;
+    }
+    return true;
+  };
+  return visit(position) ? [...closure].sort((a, b) => a - b) : null;
 }
 
 function aggregateDecision(
