@@ -34,8 +34,8 @@ export function EvidenceTimeline({ records, items, catalogSource }: EvidenceTime
 
   return (
     <SectionPanel
-      title="Evidence Timeline"
-      description={`Captured support, publisher context, and security findings in retrieval order. Catalog: ${catalogSource === "channel3" ? "Channel3 · live data" : "Demo fixtures"}.`}
+      title="Evidence behind the recommendation"
+      description={`Sources, excerpts, and security checks supporting these items. Catalog: ${catalogSource === "channel3" ? "Channel3 · live data" : "Demo fixtures"}.`}
       icon={<EvidenceIcon />}
       testId="evidence-timeline"
       action={<StatusBadge tone="neutral">{records.length} {records.length === 1 ? "capture" : "captures"}</StatusBadge>}

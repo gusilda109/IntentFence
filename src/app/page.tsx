@@ -5,20 +5,20 @@ const reviewSteps = [
   {
     icon: <EvidenceIcon />,
     number: "01",
-    title: "Research with receipts",
-    text: "Every proposed item stays connected to captured evidence, publisher identity, and a security report.",
+    title: "We research the options",
+    text: "Tell us the outcome, not a product list. Live research uses Qwen to explore suitable products; demo mode uses a ready-made catalog.",
   },
   {
     icon: <VerdictIcon />,
     number: "02",
-    title: "Policy before payment",
-    text: "Necessity, compatibility, dependencies, and budget are evaluated before any order can be created.",
+    title: "You get clear decisions, with evidence",
+    text: "See why each item fits, what it costs, and which constraints shaped the recommendation—before you decide what to do next.",
   },
   {
     icon: <LockIcon />,
     number: "03",
-    title: "A narrow payment boundary",
-    text: "Only an approved snapshot reaches the executor. Sandbox order creation never means captured payment.",
+    title: "You stay in control",
+    text: "Review the proposed order and choose the next step. PayPal Sandbox order creation never automatically captures a payment.",
   },
 ];
 
@@ -27,15 +27,15 @@ export default function Home() {
     <main className="page-shell home-page">
       <section className="hero-grid" aria-labelledby="hero-title">
         <div className="hero-copy-column">
-          <p className="eyebrow"><span className="eyebrow-line" /> Autonomous, not unbounded</p>
-          <h1 id="hero-title" className="hero-title">A purchase should prove it belongs.</h1>
+          <p className="eyebrow"><span className="eyebrow-line" /> Your goal, your spending limits</p>
+          <h1 id="hero-title" className="hero-title">What can we help you buy?</h1>
           <p className="hero-copy">
-            Define the outcome and the limits. IntentFence researches the order, tests every item against trusted evidence, and keeps PayPal behind a deterministic approval boundary.
+            Tell us what you need and how much you want to spend. We’ll research the options, explain every decision, and keep spending within your limits.
           </p>
-          <div className="hero-assurances" aria-label="Platform assurances">
-            <span>Open-ended goals</span>
-            <span>Item-level verdicts</span>
-            <span>No capture</span>
+          <div className="hero-assurances" aria-label="Purchase assurances">
+            <span>You set the limits</span>
+            <span>Every decision is explained</span>
+            <span>No automatic payment capture</span>
           </div>
         </div>
         <MandateForm />
@@ -43,8 +43,8 @@ export default function Home() {
 
       <section className="review-section" aria-labelledby="review-title">
         <div className="review-section-heading">
-          <p className="eyebrow">One accountable review</p>
-          <h2 id="review-title">From intent to a defensible order.</h2>
+          <p className="eyebrow">From your goal to a confident choice</p>
+          <h2 id="review-title">How it works</h2>
         </div>
         <div className="review-steps">
           {reviewSteps.map((step) => (

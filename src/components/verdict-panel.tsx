@@ -22,8 +22,10 @@ export function VerdictPanel({ run }: { run: RunView }) {
 
   return (
     <SectionPanel
-      title="Verdict"
-      description="The saved policy decision for this exact proposal."
+      title="Decision & reasoning"
+      description={run.replay
+        ? "Deterministic demo analysis, checked against your budget and purchase rules."
+        : "Qwen’s product research, checked against your budget and purchase rules."}
       icon={<VerdictIcon />}
       testId="verdict-panel"
       action={verdict ? <StatusBadge tone={verdictTones[verdict.decision]} dot>{verdict.decision}</StatusBadge> : null}

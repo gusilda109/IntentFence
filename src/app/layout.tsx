@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     default: "IntentFence — Policy-gated purchasing",
     template: "%s · IntentFence",
   },
-  description: "Evidence-backed purchase review with deterministic PayPal Sandbox order controls.",
+  description: "Tell IntentFence what you need and your spending limit. Get researched options, evidence-backed decisions, and PayPal Sandbox checkout without automatic payment capture.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -27,17 +27,17 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
             </Link>
             <Link href="/" className="header-link">
               <PlusIcon />
-              <span>New mandate</span>
+              <span>New purchase</span>
             </Link>
           </div>
         </header>
         {children}
         <footer className="site-footer">
-          <span>IntentFence MVP</span>
+          <span>IntentFence</span>
           <span aria-hidden="true">·</span>
-          <span>PayPal Orders v2 Sandbox</span>
+          <span>Clear choices, with your spending limits built in</span>
           <span aria-hidden="true">·</span>
-          <span>No capture</span>
+          <span>PayPal Sandbox · no automatic payment capture</span>
         </footer>
       </body>
     </html>

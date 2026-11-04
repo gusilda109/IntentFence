@@ -17,8 +17,10 @@ export function OrderItems({ run }: { run: RunView }) {
 
   return (
     <SectionPanel
-      title="Order Items"
-      description="Proposed products and their individual policy decisions."
+      title={run.replay ? "Recommended items" : "What Qwen recommends"}
+      description={run.replay
+        ? "Items selected for this demo, with the purpose and policy outcome for each."
+        : "Items selected for your request, with the purpose and policy outcome for each."}
       icon={<BoxIcon />}
       testId="order-items"
       action={order ? <StatusBadge tone="neutral">{order.items.length} {order.items.length === 1 ? "item" : "items"}</StatusBadge> : null}

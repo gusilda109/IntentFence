@@ -118,9 +118,10 @@ export function RunDashboard({ runId }: { runId: string }) {
       <div className="run-topbar">
         <div className="run-heading">
           <div className="run-heading-line">
-            <h1>Purchase review</h1>
+            <h1>Your purchase review</h1>
             <StatusBadge tone={status.tone} dot>{status.label}</StatusBadge>
           </div>
+          <p>Here’s what we found, and why.</p>
           <p className="run-id">Run {run.id} · Updated {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(run.updatedAt))}</p>
         </div>
         <div className="run-topbar-actions">

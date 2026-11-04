@@ -156,45 +156,17 @@ export function MandateForm() {
     <div className="mandate-card">
       <div className="mandate-card-header">
         <div>
-          <p className="panel-eyebrow">New purchase review</p>
-          <h2>Define your mandate</h2>
-          <p>Set the intent. The evidence will determine the order.</p>
+          <p className="panel-eyebrow">New purchase</p>
+          <h2>Let’s start with what you need</h2>
+          <p>A plain-language goal is enough. We’ll handle the product research.</p>
         </div>
         <span className="mandate-shield"><ShieldCheckIcon /></span>
       </div>
 
       <form onSubmit={submitMandate} data-testid="mandate-form" noValidate>
-        <fieldset className="catalog-source-field" disabled={submitting}>
-          <legend className="field-label">Product data source</legend>
-          <div className="catalog-source-control" role="group" aria-label="Product data source">
-            <button
-              type="button"
-              className={catalogSource === "fixtures" ? "is-selected" : ""}
-              aria-pressed={catalogSource === "fixtures"}
-              data-testid="catalog-source-fixtures"
-              onClick={() => { setCatalogSource("fixtures"); setError(null); }}
-            >
-              Demo fixtures
-            </button>
-            <button
-              type="button"
-              className={catalogSource === "channel3" ? "is-selected" : ""}
-              aria-pressed={catalogSource === "channel3"}
-              data-testid="catalog-source-channel3"
-              onClick={() => { setCatalogSource("channel3"); setError(null); }}
-            >
-              Channel3 · live data
-            </button>
-          </div>
-          <p className="field-help">
-            {catalogSource === "fixtures"
-              ? "Offline deterministic scenarios. No external catalog requests."
-              : "Real product discovery through the server-side Channel3 API. Requires CHANNEL3_API_KEY; errors never fall back to fixtures."}
-          </p>
-        </fieldset>
         <div className="form-field">
           <div className="field-label-row">
-            <label htmlFor="goal" className="field-label">Purchase goal</label>
+            <label htmlFor="goal" className="field-label">What do you need?</label>
             <span className="field-meta">{goal.length} / 2,000</span>
           </div>
           <textarea
@@ -203,17 +175,17 @@ export function MandateForm() {
             className="text-area goal-input"
             value={goal}
             onChange={(event) => setGoal(event.target.value)}
-            placeholder="Describe what you want to accomplish, not which products to buy…"
+            placeholder="For example: I need a simple checkout setup for my coffee shop…"
             maxLength={2000}
             rows={4}
             required
             disabled={submitting}
           />
-          <p className="field-help">Use an open-ended outcome. Product selection happens during the review.</p>
+          <p className="field-help">Describe the outcome you want. You don’t need to know which products to choose.</p>
         </div>
 
         <div className="form-field">
-          <label htmlFor="budget" className="field-label">Maximum budget</label>
+          <label htmlFor="budget" className="field-label">What’s your spending limit?</label>
           <div className="budget-input-wrap">
             <span className="budget-prefix" aria-hidden="true">$</span>
             <input
@@ -232,13 +204,43 @@ export function MandateForm() {
             />
             <span className="budget-currency">USD</span>
           </div>
-          <p id="budget-help" className="field-help">Final order total cannot exceed this amount.</p>
+          <p id="budget-help" className="field-help">We’ll keep the final order total at or below this amount.</p>
         </div>
 
+        <fieldset className="catalog-source-field" disabled={submitting}>
+          <legend className="field-label">Where should we look?</legend>
+          <div className="catalog-source-control" role="group" aria-label="Where should we look?">
+            <button
+              type="button"
+              className={catalogSource === "fixtures" ? "is-selected" : ""}
+              aria-pressed={catalogSource === "fixtures"}
+              data-testid="catalog-source-fixtures"
+              onClick={() => { setCatalogSource("fixtures"); setError(null); }}
+            >
+              Demo catalog
+            </button>
+            <button
+              type="button"
+              className={catalogSource === "channel3" ? "is-selected" : ""}
+              aria-pressed={catalogSource === "channel3"}
+              data-testid="catalog-source-channel3"
+              onClick={() => { setCatalogSource("channel3"); setError(null); }}
+            >
+              Live products · Channel3
+            </button>
+          </div>
+          <p className="field-help">
+            {catalogSource === "fixtures"
+              ? "Explore a ready-made catalog without any external product requests."
+              : "Research live products through Channel3. If the service is unavailable, we’ll show the error rather than switch catalogs."}
+          </p>
+        </fieldset>
+
         <fieldset className="constraints-fieldset" disabled={submitting}>
-          <legend className="field-label">Constraints <span>(optional)</span></legend>
+          <legend className="field-label">Any must-haves or preferences? <span>(optional)</span></legend>
+          <p className="field-help">Hard constraints are deal-breakers. Soft preferences help us choose between suitable options.</p>
           {constraints.length === 0 ? (
-            <p className="constraints-empty">Add hard limits or soft preferences to guide the review.</p>
+            <p className="constraints-empty">Nothing added yet—your goal and budget are enough to get started.</p>
           ) : (
             <div className="constraint-list">
               {constraints.map((constraint, index) => (
@@ -251,7 +253,7 @@ export function MandateForm() {
                       className="text-input"
                       value={constraint.text}
                       onChange={(event) => updateConstraint(constraint.id, { text: event.target.value })}
-                      placeholder="e.g. Must work with my existing tablet"
+                      placeholder="For example: It must work with my existing tablet"
                       maxLength={500}
                     />
                     <div className="constraint-row-bottom">
@@ -292,30 +294,39 @@ export function MandateForm() {
         {error ? <div className="form-error" role="alert">{error}</div> : null}
 
         <div className="form-actions">
-          <button type="button" className="example-button" onClick={loadCoffeeExample} disabled={submitting}>
-            <SparkIcon /> Coffee shop example · $800
-          </button>
-          <button
-            type="button"
-            className="example-button"
-            data-testid="incompatible-printer-example"
-            onClick={loadIncompatiblePrinterExample}
-            disabled={submitting}
-          >
-            <SparkIcon /> Incompatible printer demo · $250
-          </button>
-          <button
-            type="button"
-            className="example-button"
-            data-testid="protection-pack-example"
-            onClick={loadProtectionPackExample}
-            disabled={submitting}
-          >
-            <SparkIcon /> Protection pack guard · Channel3
-          </button>
+          <div className="example-group" aria-labelledby="examples-title">
+            <p id="examples-title" className="field-label">Not sure where to start? Try an example</p>
+            <button
+              type="button"
+              className="example-button"
+              aria-label="Coffee shop example · $800"
+              onClick={loadCoffeeExample}
+              disabled={submitting}
+            >
+              <SparkIcon /> Coffee shop example · $800
+            </button>
+            <button
+              type="button"
+              className="example-button"
+              data-testid="incompatible-printer-example"
+              onClick={loadIncompatiblePrinterExample}
+              disabled={submitting}
+            >
+              <SparkIcon /> Incompatible printer demo · $250
+            </button>
+            <button
+              type="button"
+              className="example-button"
+              data-testid="protection-pack-example"
+              onClick={loadProtectionPackExample}
+              disabled={submitting}
+            >
+              <SparkIcon /> Protection pack guard · Channel3
+            </button>
+          </div>
           <button type="submit" className="button button-primary submit-run" data-testid="submit-run" disabled={submitting}>
             {submitting ? <span className="spinner" aria-hidden="true" /> : <ShieldCheckIcon />}
-            {submitting ? "Reviewing mandate…" : "Start purchase review"}
+            {submitting ? "Reviewing your purchase…" : "Review my purchase"}
             {!submitting ? <ArrowRightIcon /> : null}
           </button>
         </div>
@@ -323,13 +334,13 @@ export function MandateForm() {
         {submitting ? (
           <div className="run-progress-notice" role="status" aria-live="polite">
             <div>
-              <strong>Building an evidence-backed review</strong>
-              <p>This synchronous run may take a moment. Keep this page open.</p>
+              <strong>We’re researching your purchase</strong>
+              <p>This can take a moment. Keep this page open while we check the options.</p>
             </div>
             <ol>
-              <li><span>1</span> Research items</li>
-              <li><span>2</span> Verify evidence</li>
-              <li><span>3</span> Evaluate verdict</li>
+              <li><span>1</span> Research options</li>
+              <li><span>2</span> Check the evidence</li>
+              <li><span>3</span> Explain the recommendation</li>
             </ol>
           </div>
         ) : null}
