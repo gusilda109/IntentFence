@@ -215,6 +215,7 @@ function makeItem(input: {
   purpose: string;
   necessityEvidenceIds: string[];
   compatibility?: ProposedOrderItem["compatibility"];
+  listingTitle?: string;
 }): ProposedOrderItem {
   return {
     id: input.id,
@@ -227,6 +228,11 @@ function makeItem(input: {
     purpose: input.purpose,
     necessityEvidenceIds: input.necessityEvidenceIds,
     compatibility: input.compatibility ?? [],
+    catalogListing: {
+      source: "fixtures",
+      title: input.listingTitle ?? input.name,
+      unitPrice: { currency: "USD", amountMinor: input.amountMinor },
+    },
   };
 }
 

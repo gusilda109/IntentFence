@@ -23,6 +23,40 @@ const editProposal = (proposal: ProposedOrder, edit: (draft: ProposedOrder) => v
     expect(proposal.total.amountMinor).toBe(32900 + 18900 + 3900 + 9900);
   });
 
+  it("attaches the trusted registry listing and discards one supplied by the Actor", () => {
+    const { mandate, proposal, evidence } = setup();
+    const forged = editProposal(proposal, (draft) => {
+      draft.items[3].catalogListing = {
+        source: "fixtures",
+        title: "Coffee shop checkout tablet",
+        category: "tablet",
+        unitPrice: { currency: "USD", amountMinor: 1 },
+      };
+    });
+
+    const validated = validateProposedOrder(mandate, forged, evidence);
+
+    expect(validated.items[3].catalogListing).toEqual({
+      source: "fixtures",
+      title: "Calibration License — infected demo fixture",
+      category: "software license",
+      unitPrice: { currency: "USD", amountMinor: 9900 },
+    });
+  });
+
+  it("keeps an Actor price that differs from the catalog visible for the policy engine", () => {
+    const { mandate, proposal, evidence } = setup();
+    const cheap = editProposal(proposal, (draft) => {
+      draft.items[0].unitPrice.amountMinor = 100;
+      draft.total.amountMinor -= 32900 - 100;
+    });
+
+    const validated = validateProposedOrder(mandate, cheap, evidence);
+
+    expect(validated.items[0].unitPrice.amountMinor).toBe(100);
+    expect(validated.items[0].catalogListing?.unitPrice.amountMinor).toBe(32900);
+  });
+
   it("rejects unknown and omitted evidence references", () => {
     const { mandate, proposal, evidence } = setup();
     const unknown = editProposal(proposal, (draft) => {

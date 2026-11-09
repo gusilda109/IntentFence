@@ -41,6 +41,7 @@ describe("payment-free contracts and safe read models", () => {
       "createdAt",
     ]);
     expectExactKeys(ProposedOrderItemSchema, [
+      "catalogListing",
       "id",
       "storeId",
       "productUrl",

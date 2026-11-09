@@ -1,5 +1,5 @@
 import { STORE_PAGE_HTML, type StorePageContentKey } from "./content";
-import type { CatalogEntry, StorePageDefinition, StoreRegistration } from "./types";
+import type { CatalogEntry, ProductListing, StorePageDefinition, StoreRegistration } from "./types";
 
 const DEFAULT_LOCAL_STORE_ORIGIN = "http://localhost:3000";
 
@@ -72,6 +72,7 @@ const page = (
   title: string,
   kind: StorePageDefinition["kind"],
   demoLabel?: string,
+  listing?: ProductListing,
 ): StorePageDefinition => {
   const key = `${storeId}/${slug}` as StorePageContentKey;
   const rawHtml = STORE_PAGE_HTML[key];
@@ -88,29 +89,46 @@ const page = (
     demoLabel,
     url: `${registration.baseUrl}/${slug}`,
     rawHtml,
+    ...(listing ? { listing: Object.freeze({ ...listing }) } : {}),
   });
 };
 
 export const STORE_PAGES: readonly StorePageDefinition[] = Object.freeze([
   page("tablet-hub", "catalog", "Tablet Hub catalog", "catalog"),
-  page("tablet-hub", "products/hubtab-s10", "HubTab S10", "product"),
+  page("tablet-hub", "products/hubtab-s10", "HubTab S10", "product", undefined, {
+    category: "tablet / планшет",
+    priceMinor: 32_900,
+  }),
   page("tablet-hub", "specs/hubtab-s10", "HubTab S10 specifications", "document"),
   page("pos-supply", "catalog", "POS Supply catalog", "catalog"),
-  page("pos-supply", "products/rp-80-printer", "RP-80 Thermal Receipt Printer", "product"),
-  page("pos-supply", "products/rp-90-serial-printer", "RP-90 Serial Receipt Printer", "product"),
-  page("pos-supply", "products/linkbridge-usbc-adapter", "LinkBridge USB-C Receipt Adapter", "product"),
+  page("pos-supply", "products/rp-80-printer", "RP-80 Thermal Receipt Printer", "product", undefined, {
+    category: "receipt printer",
+    priceMinor: 18_900,
+  }),
+  page("pos-supply", "products/rp-90-serial-printer", "RP-90 Serial Receipt Printer", "product", undefined, {
+    category: "receipt printer",
+    priceMinor: 14_900,
+  }),
+  page("pos-supply", "products/linkbridge-usbc-adapter", "LinkBridge USB-C Receipt Adapter", "product", undefined, {
+    category: "USB-C adapter",
+    priceMinor: 3_900,
+  }),
   page("maker-docs", "catalog", "Maker Docs index", "catalog"),
   page("maker-docs", "compatibility/hubtab-s10-rp-80", "HubTab S10 + RP-80 compatibility", "document"),
   page("maker-docs", "compatibility/hubtab-s10-rp-90", "HubTab S10 + RP-90 incompatibility", "document"),
   page("maker-docs", "compatibility/linkbridge-adapter", "LinkBridge interface requirements", "document"),
   page("checkout-bundles", "catalog", "Checkout Bundles catalog", "catalog"),
-  page("checkout-bundles", "bundles/counter-start", "Counter Start Bundle", "product"),
+  page("checkout-bundles", "bundles/counter-start", "Counter Start Bundle", "product", undefined, {
+    category: "accessory bundle",
+    priceMinor: 4_500,
+  }),
   page(
     "checkout-bundles",
     "products/calibration-license",
     "Calibration License — infected demo fixture",
     "product",
     "INFECTED DEMO FIXTURE — hidden agent-directed instructions",
+    { category: "software license", priceMinor: 9_900 },
   ),
 ]);
 
@@ -179,6 +197,15 @@ export function listCatalog(storeId?: string): CatalogEntry[] {
         ...(entry.demoLabel ? { demoLabel: entry.demoLabel } : {}),
       };
     });
+}
+
+export function getProductListing(storeId: string, input: string): ProductListing | undefined {
+  try {
+    const entry = getStorePageByUrl(input);
+    return entry.storeId === storeId && entry.kind === "product" ? entry.listing : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function isAllowlistedProductUrl(storeId: string, input: string): boolean {
