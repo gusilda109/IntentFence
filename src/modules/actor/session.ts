@@ -1,4 +1,4 @@
-import type { Evidence, EvidenceRecord } from "@/shared/contracts";
+import type { CatalogListing, Evidence, EvidenceRecord } from "@/shared/contracts";
 import type { CatalogCandidate } from "@/modules/catalog/types";
 import { captureStorePage, evidenceFromCapture, type TrustedCapture } from "./evidence";
 
@@ -6,6 +6,7 @@ export class ActorEvidenceSession {
   private readonly captures = new Map<string, TrustedCapture>();
   private readonly records = new Map<string, Map<string, EvidenceRecord>>();
   private readonly productUrls = new Set<string>();
+  private readonly listings = new Map<string, CatalogListing>();
 
   readPage(url: string): TrustedCapture {
     const capture = captureStorePage(url);
@@ -16,7 +17,22 @@ export class ActorEvidenceSession {
   registerCandidate(candidate: CatalogCandidate): TrustedCapture {
     this.captures.set(candidate.capture.url, candidate.capture);
     if (candidate.kind === "product") this.productUrls.add(candidate.capture.url);
+    if (candidate.product) {
+      // Channel3 Product Detail is the trusted source of the selected offer's
+      // title and price; the Actor's own draft values are compared against it.
+      this.listings.set(candidate.capture.url, {
+        source: "channel3",
+        title: candidate.product.title.slice(0, 300),
+        unitPrice: { currency: "USD", amountMinor: candidate.product.amountMinor },
+      });
+    }
     return candidate.capture;
+  }
+
+  getCatalogListing(storeId: string, url: string): CatalogListing | undefined {
+    if (!this.isRegisteredProductUrl(storeId, url)) return undefined;
+    const listing = this.listings.get(url);
+    return listing ? structuredClone(listing) : undefined;
   }
 
   getCapture(url: string): TrustedCapture | undefined {

@@ -37,7 +37,9 @@ function providerFor(detail: Channel3Product) {
 
 describe("mocked Channel3 end-to-end run", () => {
   it("uses Channel3 evidence through approval and idempotent PayPal order creation without exposing credentials", async () => {
-    const mandate = coffeeMandate();
+    // Direct-request status is matched against the Channel3 title, so the goal
+    // must name the product in the same language as the catalog.
+    const mandate = { ...coffeeMandate(), goal: "Set up coffee shop checkout on a point of sale tablet" };
     const { client, provider } = providerFor(product());
     const actor = createActor({ mode: "replay", catalogSource: "channel3", catalogProvider: provider });
     const proposal = await actor.propose(mandate);
@@ -93,5 +95,33 @@ describe("mocked Channel3 end-to-end run", () => {
     expect(verdict.findings.map((finding) => finding.code)).toContain("INSUFFICIENT_NECESSITY");
     expect(verdict.itemDecisions).toHaveLength(1);
     expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it("does not treat an add-on as requested because its purpose repeats a long goal", async () => {
+    // The deterministic Channel3 Actor copies the whole goal into `purpose`.
+    // That text must not make an unrelated catalog title count as requested.
+    const mandate = {
+      ...coffeeMandate(),
+      goal: "Buy a point of sale tablet for the cafe counter checkout and protect it",
+    };
+    const { provider } = providerFor(product({
+      id: "warranty-2",
+      title: "Extended warranty",
+      description: "Optional merchant protection plan",
+      offers: [{
+        url: "https://merchant.example/warranty-2",
+        domain: "merchant.example",
+        price: { price: 99, currency: "USD" },
+        availability: "InStock",
+      }],
+    }));
+    const actor = createActor({ mode: "replay", catalogSource: "channel3", catalogProvider: provider });
+    const proposal = await actor.propose(mandate);
+    const evidence = await actor.getEvidence(mandate.id);
+    const verdict = await createSupervisor({ mode: "replay" }).evaluateWithEvidence(mandate, proposal, evidence);
+
+    expect(proposal.items[0].purpose).toContain(mandate.goal);
+    expect(proposal.items[0].catalogListing).toMatchObject({ source: "channel3", title: "Extended warranty" });
+    expect(verdict.decision).toBe("REVIEW");
   });
 });

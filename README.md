@@ -1,6 +1,33 @@
-# IntentFence
+# IntentGuard
 
-A PayPal-native service for validating autonomous purchases. IntentFence accepts an open-ended user mandate, explores local demo fixtures or the live Channel3 catalog, builds an Evidence Timeline, and creates a **real PayPal Orders v2 Sandbox Order** only after deterministic approval. Capture, refunds, and actual payments are not performed.
+A PayPal-native service for validating autonomous purchases. IntentGuard accepts an open-ended user mandate, explores local demo fixtures or the live Channel3 catalog, builds an Evidence Timeline, and creates a **real PayPal Orders v2 Sandbox Order** only after deterministic approval. Capture, refunds, and actual payments are not performed.
+
+**Live demo:** https://intentguard.gehrman.me (no login required)
+
+## How IntentGuard Uses PayPal, AI, and Channel3
+
+**PayPal (Developer Sandbox)**
+
+- **Sandbox REST app:** every payment request goes to `https://api-m.sandbox.paypal.com`, and production endpoints are rejected in code.
+- **OAuth 2.0** (`POST /v1/oauth2/token`): the Payment Executor gets a Sandbox access token. It is the only module that reads PayPal credentials.
+- **Orders v2: Create Order** (`POST /v2/checkout/orders`): turns the approved items into a real Sandbox order and shows PayPal's `approve` link in the UI. Payment is never captured.
+- **`PayPal-Request-Id` idempotency:** each approved order has one stored request ID, so retries and parallel clicks return the same PayPal order. In tests, 10 concurrent execute calls produce exactly one order.
+- When the verdict is `BLOCK` or `REVIEW`, PayPal is never called: no OAuth and no Orders request. Security tests verify this.
+
+**AI**
+
+- **OpenAI Agents SDK (TypeScript)** orchestrates two strictly separated agents with Zod-validated structured output, running on any OpenAI-compatible Chat Completions endpoint.
+- **Actor:** `Qwen3.8-27B` researches products from a read-only catalog snapshot and drafts an order with evidence for each item. It has no access to payments.
+- **Supervisor:** `qwen3.8-flash-next` independently judges each item against the user's mandate (necessity, compatibility, seller-only claims). It has no network or payment tools.
+- **Deterministic Policy Engine:** plain TypeScript checks the budget, publisher independence, prompt-injection quarantine, and catalog prices. The LLM cannot override its critical findings.
+
+**Channel3 (sponsor integration)**
+
+- The `Channel3 · live data` catalog source uses the Channel3 **Search** and **Product Detail** APIs to research real products.
+- Channel3 data is classified as an `aggregator` source. It is never treated as manufacturer or independent evidence, and commission rates never affect the verdict.
+- Selected offers are revalidated before approval. On any Channel3 error, the run stops with a readable error instead of silently falling back to demo data.
+
+**Other tools:** Next.js, React, Tailwind CSS, Prisma + SQLite, Vitest, Playwright, Docker.
 
 ## Architecture and Guarantees
 
@@ -45,7 +72,7 @@ npm run db:migrate
 | `APP_BASE_URL` | Public HTTP(S) origin for demo fixture links. Optional on Render, where `RENDER_EXTERNAL_URL` is detected automatically; otherwise defaults to `http://localhost:3000`. |
 | `APP_MODE` | `live` — real Actor/Supervisor and PayPal; `replay` — stored deterministic agent fixtures. |
 | `OPENAI_API_KEY` | Used only by the Live Actor/Supervisor. Never sent to the browser. |
-| `OPENAI_BASE_URL` | OpenAI-compatible base URL. For Qwen: `https://deepcode.ci.nsu.ru/api`; the SDK appends `/chat/completions`. |
+| `OPENAI_BASE_URL` | Any OpenAI-compatible base URL serving the configured models. Our deployment uses Qwen at `https://deepcode.ci.nsu.ru/api`; the SDK appends `/chat/completions`. |
 | `OPENAI_MODEL_ACTOR` | Live Actor model, for example `Qwen3.8-27B`. |
 | `OPENAI_MODEL_SUPERVISOR` | Live Supervisor model, for example `qwen3.8-flash-next`. |
 | `PAYPAL_MODE` | `live` for real Sandbox REST requests; `mock` is allowed only with `APP_MODE=replay`. |
@@ -154,3 +181,7 @@ npm run start
 ## MVP Limitations
 
 USD only, final prices of selected offers only, one purchase unit, and no taxes, shipping, capture, refunds, or webhooks. Replay with fixtures supports stored coffee/printer inputs; open-ended goals in Replay are available through Channel3, while fixtures require Live mode. Render deployment is not configured. An old `PAYMENT_UNKNOWN` outside the PayPal idempotency window requires manual reconciliation rather than automatic creation of a new Order.
+
+## License
+
+[MIT](LICENSE)

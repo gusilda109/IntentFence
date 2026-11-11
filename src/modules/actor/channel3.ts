@@ -3,7 +3,7 @@ import type { Mandate, ProposedOrder } from "@/shared/contracts";
 import type { CatalogProvider } from "@/modules/catalog/types";
 import type { ActorEvidenceSession } from "./session";
 import { attachCatalogImages } from "./catalog-images";
-import { validateProposedOrder } from "./validation";
+import { fixtureCatalogListing, validateProposedOrder } from "./validation";
 
 export async function runDeterministicChannel3Actor(
   mandate: Mandate,
@@ -64,6 +64,8 @@ export async function runDeterministicChannel3Actor(
   }, session.list(mandate.id), {
     getCapture: (url) => session.getCapture(url),
     isAllowedProductUrl: (storeId, url) => session.isRegisteredProductUrl(storeId, url),
+    getCatalogListing: (storeId, url) => session.getCatalogListing(storeId, url)
+      ?? fixtureCatalogListing(storeId, url),
   });
   await provider.validateSelection(proposal);
   return attachCatalogImages(proposal, candidates);

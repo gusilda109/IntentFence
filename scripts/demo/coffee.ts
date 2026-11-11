@@ -13,13 +13,13 @@ class DemoError extends Error {}
 
 function usage(): never {
   console.log("Usage: npm run demo -- [--base-url http://127.0.0.1:3000]");
-  console.log("Environment alternative: INTENTFENCE_BASE_URL");
+  console.log("Environment alternative: INTENTGUARD_BASE_URL");
   process.exit(0);
 }
 
 function resolveBaseUrl(): string {
   const args = process.argv.slice(2);
-  let value = process.env.INTENTFENCE_BASE_URL ?? DEFAULT_BASE_URL;
+  let value = process.env.INTENTGUARD_BASE_URL ?? process.env.INTENTFENCE_BASE_URL ?? DEFAULT_BASE_URL;
 
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];

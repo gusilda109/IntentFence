@@ -66,4 +66,22 @@ describe("approval builder mandate coverage", () => {
       })),
     })).toThrow("BUDGET_EXCEEDED");
   });
+
+  it("refuses to approve an item whose price differs from the trusted listing", async () => {
+    const scenario = dependencyPolicyScenario();
+    const verdict = await createSupervisor({ mode: "replay" }).evaluateWithEvidence(
+      scenario.mandate,
+      scenario.proposedOrder,
+      scenario.evidence,
+    );
+    const tampered = structuredClone(scenario.proposedOrder);
+    tampered.items[0].unitPrice = { currency: "USD", amountMinor: 1 };
+    tampered.total = {
+      currency: "USD",
+      amountMinor: tampered.items.reduce((sum, item) => sum + item.unitPrice.amountMinor * item.quantity, 0),
+    };
+
+    expect(verdict.decision).toBe("ALLOW");
+    expect(() => buildApprovedOrder(scenario.mandate, tampered, verdict)).toThrow("PRICE_MISMATCH");
+  });
 });

@@ -125,7 +125,7 @@ export function PayPalStatus({ run, executing, executeError, onExecute }: PayPal
           {executeError ? <div className="payment-error" role="alert">{executeError}</div> : null}
         </div>
       ) : null}
-      <p className="paypal-footnote"><LockIcon /> IntentFence creates Sandbox orders only. It never captures payment in this MVP.</p>
+      <p className="paypal-footnote"><LockIcon /> IntentGuard creates Sandbox orders only. It never captures payment in this MVP.</p>
     </SectionPanel>
   );
 }
