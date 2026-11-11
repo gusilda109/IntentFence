@@ -138,7 +138,7 @@ export async function runLiveActor(
     };
   });
   const researchAgent = new Agent({
-    name: "IntentFence Actor Research",
+    name: "IntentGuard Actor Research",
     instructions: ACTOR_INSTRUCTIONS,
     outputType: ActorOrderDraftSchema,
     tools: [],

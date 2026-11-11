@@ -65,7 +65,7 @@ export function createSupervisor(options: SupervisorOptions = {}): Supervisor {
   const mode = options.mode ?? "replay";
   const agent = mode === "live"
     ? new Agent({
-      name: "IntentFence Semantic Supervisor",
+      name: "IntentGuard Semantic Supervisor",
       instructions: supervisorInstructions,
       outputType: VerdictSchema,
       tools: [],

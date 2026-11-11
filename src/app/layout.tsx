@@ -6,8 +6,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "IntentFence — Policy-gated purchasing",
-    template: "%s · IntentFence",
+    default: "IntentGuard — Policy-gated purchasing",
+    template: "%s · IntentGuard",
   },
   description: "Evidence-backed purchase review with deterministic PayPal Sandbox order controls.",
 };
@@ -18,10 +18,10 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body>
         <header className="site-header">
           <div className="site-header-inner">
-            <Link href="/" className="brand" aria-label="IntentFence home">
+            <Link href="/" className="brand" aria-label="IntentGuard home">
               <span className="brand-mark"><ShieldCheckIcon /></span>
               <span className="brand-copy">
-                <strong>IntentFence</strong>
+                <strong>IntentGuard</strong>
                 <span>Policy-gated purchasing</span>
               </span>
             </Link>
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         </header>
         {children}
         <footer className="site-footer">
-          <span>IntentFence MVP</span>
+          <span>IntentGuard MVP</span>
           <span aria-hidden="true">·</span>
           <span>PayPal Orders v2 Sandbox</span>
           <span aria-hidden="true">·</span>

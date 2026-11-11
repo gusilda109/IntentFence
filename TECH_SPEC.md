@@ -1,4 +1,4 @@
-# IntentFence — техническая спецификация MVP
+# IntentGuard — техническая спецификация MVP
 
 Проект: PayPal AI Hackathon  
 Тип: PayPal-native сервис проверки автономных покупок, не чат-бот  
@@ -7,7 +7,7 @@
 
 ## 1. Цель и неизменяемые инварианты
 
-IntentFence принимает открытый пользовательский мандат, исследует товары, проверяет предложенный заказ и только после разрешения создаёт настоящий PayPal Orders v2 Sandbox Order.
+IntentGuard принимает открытый пользовательский мандат, исследует товары, проверяет предложенный заказ и только после разрешения создаёт настоящий PayPal Orders v2 Sandbox Order.
 
 Система обязана сохранять следующие инварианты независимо от ответов LLM:
 
@@ -59,7 +59,7 @@ IntentFence принимает открытый пользовательский
 └───────────────┬──────────────────────┬──────────────────┬───────────┘
                 │                      │                  │
 ┌───────────────▼──────────────┐ ┌─────▼──────────────┐ ┌─▼────────────────────┐
-│ Actor Agent + read-only tools│ │ IntentFence        │ │ Approval Builder     │
+│ Actor Agent + read-only tools│ │ IntentGuard        │ │ Approval Builder     │
 │ исследует открытую цель      │ │ Supervisor         │ │ обычный TypeScript   │
 │ формирует ProposedOrder      │ │ + Policy Engine    │ │ строит ApprovedOrder │
 │ НЕ имеет PayPal              │ │ ALLOW/BLOCK/REVIEW/│ │ из ALLOW-подмножества│
@@ -681,7 +681,7 @@ Playwright проходит мандат → items → timeline → verdict → 
 ### 14.1 Агент: PayPal Backend
 
 ```text
-Ты реализуешь Payment Executor для IntentFence — PayPal-native сервиса проверки автономных покупок. Это не чат-бот. Прочитай TECH_SPEC.md и shared Zod-контракты.
+Ты реализуешь Payment Executor для IntentGuard — PayPal-native сервиса проверки автономных покупок. Это не чат-бот. Прочитай TECH_SPEC.md и shared Zod-контракты.
 
 Твоя задача:
 1. Реализовать deterministic TypeScript Payment Executor без LLM.
@@ -727,7 +727,7 @@ Playwright проходит мандат → items → timeline → verdict → 
 ### 14.2 Агент: Actor + demo stores
 
 ```text
-Ты реализуешь Actor Agent и четыре локальных demo-источника для IntentFence. Это PayPal-native purchase-verification service, не чат-бот. Прочитай TECH_SPEC.md и shared Zod-контракты.
+Ты реализуешь Actor Agent и четыре локальных demo-источника для IntentGuard. Это PayPal-native purchase-verification service, не чат-бот. Прочитай TECH_SPEC.md и shared Zod-контракты.
 
 Твоя задача:
 1. Реализовать Actor через OpenAI Agents SDK for TypeScript со structured ProposedOrder output.
@@ -774,7 +774,7 @@ Playwright проходит мандат → items → timeline → verdict → 
 ### 14.3 Агент: Supervisor + Policy Engine
 
 ```text
-Ты реализуешь IntentFence Supervisor и Policy Engine. Это независимая проверка автономных покупок, не чат-бот и не категорийный фильтр. Прочитай TECH_SPEC.md и shared Zod-контракты.
+Ты реализуешь IntentGuard Supervisor и Policy Engine. Это независимая проверка автономных покупок, не чат-бот и не категорийный фильтр. Прочитай TECH_SPEC.md и shared Zod-контракты.
 
 Твоя задача:
 1. Реализовать Supervisor через OpenAI Agents SDK со structured Verdict output и без network/payment tools.
@@ -820,7 +820,7 @@ Playwright проходит мандат → items → timeline → verdict → 
 ### 14.4 Агент: Frontend
 
 ```text
-Ты реализуешь UI IntentFence на Next.js/React/Tailwind. Это PayPal-native сервис автономных покупок, не чат-бот. Прочитай TECH_SPEC.md, shared contracts и RunView/PaymentExecutionView.
+Ты реализуешь UI IntentGuard на Next.js/React/Tailwind. Это PayPal-native сервис автономных покупок, не чат-бот. Прочитай TECH_SPEC.md, shared contracts и RunView/PaymentExecutionView.
 
 Твоя задача:
 1. Создать интерфейс без чата: Mandate Form, Order Items, Evidence Timeline, Verdict Panel, PayPal Status.
@@ -869,7 +869,7 @@ Playwright проходит мандат → items → timeline → verdict → 
 ### 14.5 Агент: QA + demo
 
 ```text
-Ты отвечаешь за QA, security acceptance и воспроизводимое demo IntentFence. Это PayPal-native сервис проверки автономных покупок, не чат-бот. Прочитай TECH_SPEC.md и Definition of Done полностью.
+Ты отвечаешь за QA, security acceptance и воспроизводимое demo IntentGuard. Это PayPal-native сервис проверки автономных покупок, не чат-бот. Прочитай TECH_SPEC.md и Definition of Done полностью.
 
 Твоя задача:
 1. Написать Playwright E2E для мандата → items → Evidence Timeline → Verdict → PayPal Status.

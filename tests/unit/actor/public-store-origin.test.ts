@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const PUBLIC_ORIGIN = "https://intentfence.onrender.com";
+const PUBLIC_ORIGIN = "https://intentguard.onrender.com";
 const TABLET_PATH = "/stores/tablet-hub/products/hubtab-s10";
 
 afterEach(() => {

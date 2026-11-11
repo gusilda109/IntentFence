@@ -30,7 +30,7 @@ export default function Home() {
           <p className="eyebrow"><span className="eyebrow-line" /> Autonomous, not unbounded</p>
           <h1 id="hero-title" className="hero-title">A purchase should prove it belongs.</h1>
           <p className="hero-copy">
-            Define the outcome and the limits. IntentFence researches the order, tests every item against trusted evidence, and keeps PayPal behind a deterministic approval boundary.
+            Define the outcome and the limits. IntentGuard researches the order, tests every item against trusted evidence, and keeps PayPal behind a deterministic approval boundary.
           </p>
           <div className="hero-assurances" aria-label="Platform assurances">
             <span>Open-ended goals</span>
