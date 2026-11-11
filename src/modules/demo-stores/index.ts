@@ -6,6 +6,7 @@ export {
   canonicalizeStoreUrl,
   getStorePageByPath,
   getStorePageByUrl,
+  getProductListing,
   getStoreRegistration,
   isAllowlistedProductUrl,
   listCatalog,
@@ -13,6 +14,7 @@ export {
 export { extractBodyHtml, extractVisibleText } from "./html";
 export type {
   CatalogEntry,
+  ProductListing,
   StorePageDefinition,
   StorePageKind,
   StoreRegistration,

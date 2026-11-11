@@ -6,10 +6,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "IntentFence — Policy-gated purchasing",
-    template: "%s · IntentFence",
+    default: "IntentGuard — Policy-gated purchasing",
+    template: "%s · IntentGuard",
   },
-  description: "Tell IntentFence what you need and your spending limit. Get researched options, evidence-backed decisions, and PayPal Sandbox checkout without automatic payment capture.",
+  description: "Tell IntentGuard what you need and your spending limit. Get researched options, evidence-backed decisions, and PayPal Sandbox checkout without automatic payment capture.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -18,10 +18,10 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body>
         <header className="site-header">
           <div className="site-header-inner">
-            <Link href="/" className="brand" aria-label="IntentFence home">
+            <Link href="/" className="brand" aria-label="IntentGuard home">
               <span className="brand-mark"><ShieldCheckIcon /></span>
               <span className="brand-copy">
-                <strong>IntentFence</strong>
+                <strong>IntentGuard</strong>
                 <span>Policy-gated purchasing</span>
               </span>
             </Link>
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         </header>
         {children}
         <footer className="site-footer">
-          <span>IntentFence</span>
+          <span>IntentGuard</span>
           <span aria-hidden="true">·</span>
           <span>Clear choices, with your spending limits built in</span>
           <span aria-hidden="true">·</span>

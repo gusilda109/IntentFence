@@ -177,6 +177,23 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
       ));
     }
 
+    if (!item.catalogListing) {
+      downgrade(target, "BLOCK", finding(
+        "UNTRUSTED_EVIDENCE",
+        "critical",
+        "The item has no trusted catalog listing, so its identity and price cannot be verified.",
+        item.id,
+      ));
+    } else if (item.catalogListing.unitPrice.currency !== item.unitPrice.currency
+      || item.catalogListing.unitPrice.amountMinor !== item.unitPrice.amountMinor) {
+      downgrade(target, "BLOCK", finding(
+        "PRICE_MISMATCH",
+        "critical",
+        "The proposed unit price differs from the trusted catalog price for this offer.",
+        item.id,
+      ));
+    }
+
     const quarantinedIds = references.filter((id) =>
       recordsById.get(id)?.security.status === "QUARANTINED",
     );
@@ -259,7 +276,6 @@ export function evaluatePolicy(input: PolicyEvaluationInput): Verdict {
       return record && hasClaim(record.evidence, "necessity") ? [record] : [];
     });
     const directlyRequested = necessityRecords.some((record) => record.evidence.source.sourceClass === "user")
-      || hasReplayDirectMandatePurpose(item.purpose)
       || ((input.semanticVerdict === undefined || semantic.decision === "ALLOW")
         && isDirectlyRequested(mandate.goal, item));
     const independentNecessity = usableNecessity.some((record) =>
@@ -400,8 +416,7 @@ function evaluateReplaySemantics(
     ).filter((record) => hasClaim(record.evidence, "necessity"));
     necessityByItem.set(item.id, necessity);
     const direct = necessity.some((record) => record.evidence.source.sourceClass === "user")
-      || isDirectlyRequested(mandate.goal, item)
-      || hasReplayDirectMandatePurpose(item.purpose);
+      || isDirectlyRequested(mandate.goal, item);
     const independent = necessity.some((record) => isIndependentFromSeller(record, item, evidence));
     result.set(item.id, {
       decision: necessity.length > 0 && (direct || independent) ? "ALLOW" : "REVIEW",
@@ -493,7 +508,7 @@ function mergeSemanticDecisions(
       proposedOrder,
       recordsById,
     ).filter((record) => hasClaim(record.evidence, "necessity"));
-    const directlyRequested = hasReplayDirectMandatePurpose(item.purpose)
+    const directlyRequested = isDirectlyRequested(mandate.goal, item)
       || cleanNecessity.some((record) => record.evidence.source.sourceClass === "user");
     const isContradictoryNecessityReview = semantic.decision === "REVIEW"
       && reasons.length > 0
@@ -840,30 +855,33 @@ function hasExplicitHumanReviewConstraint(mandate: Mandate): boolean {
   });
 }
 
-function hasReplayDirectMandatePurpose(purpose: string): boolean {
-  const normalized = purpose.normalize("NFKC").toLocaleLowerCase();
-  // This recognizes the Actor's language-neutral-in-effect semantic relation,
-  // not an item name, category, or translation of any mandate wording.
-  return /\b(?:explicitly|directly)\s+(?:requested|required)\b/i.test(normalized)
-    || /\b(?:requested|required)\s+(?:by|in)\s+(?:the\s+)?(?:mandate|goal)\b/i.test(normalized);
-}
-
 export function isMandateCoreItem(mandate: Mandate, item: ProposedOrderItem): boolean {
-  return hasReplayDirectMandatePurpose(item.purpose) || isDirectlyRequested(mandate.goal, item);
+  return isDirectlyRequested(mandate.goal, item);
 }
 
+/**
+ * An item counts as directly requested only when the user's own goal wording
+ * names the kind of product that the trusted catalog says this offer is.
+ *
+ * Both inputs are outside the Actor's control: the goal is written by the user
+ * and the listing is attached by the server from the catalog. The Actor's
+ * `name`, `description`, and `purpose` are deliberately ignored, so a proposing
+ * agent cannot promote an upsell to a "requested" item by describing it that way.
+ */
 function isDirectlyRequested(goal: string, item: ProposedOrderItem): boolean {
+  const listing = item.catalogListing;
+  if (!listing) return false;
   const goalTokens = tokens(goal);
-  const purposeTokens = tokens(item.purpose);
-  const nameTokens = tokens(item.name);
-  const purposeOverlap = intersection(purposeTokens, goalTokens);
-  const nameOverlap = intersection(nameTokens, goalTokens);
-  if (purposeTokens.size === 0) return false;
-
-  // A direct item is grounded in the mandate wording itself. Auxiliary items
-  // instead enter through independent necessity or compatibility edges.
-  return (nameOverlap.size > 0 && purposeOverlap.size > 0)
-    || (purposeOverlap.size >= 2 && purposeOverlap.size / purposeTokens.size >= 0.6);
+  // Prefer the catalog's product-type label; fall back to the catalog title
+  // when the source (Channel3) supplies no category.
+  const listingTokens = tokens(listing.category ?? listing.title);
+  for (const term of listingTokens) {
+    for (const word of goalTokens) {
+      // Prefix matching tolerates inflection (e.g. "планшета" for "планшет").
+      if (word === term || (term.length >= 5 && word.startsWith(term))) return true;
+    }
+  }
+  return false;
 }
 
 function tokens(text: string): Set<string> {
@@ -875,10 +893,6 @@ function tokens(text: string): Set<string> {
       .map((token) => token.replace(/(ing|ed|es|s)$/u, ""))
       .filter((token) => (token.length > 2 || token === "tv") && !stopWords.has(token)),
   );
-}
-
-function intersection(left: Set<string>, right: Set<string>): Set<string> {
-  return new Set([...left].filter((value) => right.has(value)));
 }
 
 function hasClaim(evidence: Evidence, kind: Evidence["claims"][number]["kind"]): boolean {

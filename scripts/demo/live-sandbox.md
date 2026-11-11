@@ -10,7 +10,7 @@
 - [ ] Перед Live smoke отдельно проверьте Replay: UI и вывод script должны явно содержать `Replay` и `simulated`.
 
 ```bash
-INTENTFENCE_BASE_URL=http://127.0.0.1:3000 npm run demo
+INTENTGUARD_BASE_URL=http://127.0.0.1:3000 npm run demo
 ```
 
 ## 2. Coffee $800
