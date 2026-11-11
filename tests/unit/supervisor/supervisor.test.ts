@@ -42,11 +42,11 @@ describe("Supervisor replay policy", () => {
     );
   });
 
-  it("uses the persisted replay purpose for the required Russian coffee goal", async () => {
+  it("matches a Russian goal against the trusted catalog category", async () => {
     const scenario = coffeePolicyScenario();
     scenario.mandate.goal = "Организуй кассу кофейни на базе планшета";
     const [tablet, printer, adapter, upsell] = scenario.proposedOrder.items;
-    tablet.purpose = "Base tablet explicitly requested for the coffee counter.";
+    tablet.catalogListing = { ...tablet.catalogListing!, category: "tablet / планшет" };
 
     const verdict = await evaluate(scenario);
 
@@ -58,6 +58,55 @@ describe("Supervisor replay policy", () => {
     expect(itemDecision(verdict, upsell.id).reasons.map((reason) => reason.code)).toContain(
       "SELLER_ONLY_NECESSITY",
     );
+  });
+
+  it("ignores Actor-written wording when deciding whether an add-on was requested", async () => {
+    const scenario = coffeePolicyScenario();
+    const upsell = scenario.proposedOrder.items[3];
+    const upsellEvidence = scenario.evidence.find((record) => record.evidence.itemId === upsell.id)!;
+    upsellEvidence.security = { ...upsellEvidence.security, status: "CLEAN", findings: [] };
+    // The Actor copies the goal into the name and claims a direct request.
+    upsell.name = "Cafe checkout tablet calibration";
+    upsell.purpose = "Explicitly requested by the mandate: organize checkout for a cafe based on a tablet";
+
+    const verdict = await evaluate(scenario);
+
+    expect(itemDecision(verdict, upsell.id).decision).toBe("REVIEW");
+    expect(itemDecision(verdict, upsell.id).reasons.map((reason) => reason.code)).toContain(
+      "SELLER_ONLY_NECESSITY",
+    );
+    expect(verdict.decision).toBe("PARTIAL_ALLOW");
+  });
+
+  it("blocks an item whose proposed price differs from the trusted catalog price", async () => {
+    const scenario = coffeePolicyScenario();
+    const printer = scenario.proposedOrder.items[1];
+    printer.unitPrice = { currency: "USD", amountMinor: 100 };
+    scenario.proposedOrder.total = {
+      currency: "USD",
+      amountMinor: scenario.proposedOrder.items.reduce(
+        (sum, item) => sum + item.unitPrice.amountMinor * item.quantity,
+        0,
+      ),
+    };
+
+    const verdict = await evaluate(scenario);
+
+    expect(itemDecision(verdict, printer.id)).toMatchObject({ decision: "BLOCK" });
+    expect(itemDecision(verdict, printer.id).reasons.map((reason) => reason.code)).toContain(
+      "PRICE_MISMATCH",
+    );
+  });
+
+  it("blocks an item that has no trusted catalog listing", async () => {
+    const scenario = coffeePolicyScenario();
+    const tablet = scenario.proposedOrder.items[0];
+    delete tablet.catalogListing;
+
+    const verdict = await evaluate(scenario);
+
+    expect(itemDecision(verdict, tablet.id)).toMatchObject({ decision: "BLOCK" });
+    expect(verdict.decision).toBe("BLOCK");
   });
 
   it("requires REVIEW for an explicit hard human-review constraint", async () => {
@@ -101,6 +150,7 @@ describe("Supervisor replay policy", () => {
     scenario.mandate.goal = "buy tv and sofa for my living room";
     tv.name = "Smart TV";
     tv.purpose = "TV entertainment display";
+    tv.catalogListing = { ...tv.catalogListing!, title: "Smart TV" };
     tvEvidence.evidence.source.sourceClass = "aggregator";
     scenario.proposedOrder.items = [tv];
     scenario.proposedOrder.evidenceIds = [tvEvidence.evidence.id];
@@ -120,6 +170,7 @@ describe("Supervisor replay policy", () => {
     scenario.mandate.goal = "Buy a Samsung The Frame Pro TV for my living room";
     tv.name = "Samsung The Frame Pro 65-inch TV";
     tv.purpose = "Samsung The Frame Pro TV explicitly requested by the mandate for the living room";
+    tv.catalogListing = { ...tv.catalogListing!, title: "Samsung The Frame Pro 65-inch TV" };
     tvEvidence.evidence.source.sourceClass = "aggregator";
     scenario.proposedOrder.items = [tv];
     scenario.proposedOrder.evidenceIds = [tvEvidence.evidence.id];

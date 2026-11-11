@@ -2,11 +2,17 @@ import {
   EvidenceRecordSchema,
   MandateSchema,
   ProposedOrderSchema,
+  type CatalogListing,
   type EvidenceRecord,
   type Mandate,
   type ProposedOrder,
 } from "@/shared/contracts";
-import { getStorePageByUrl, getStoreRegistration, isAllowlistedProductUrl } from "@/modules/demo-stores";
+import {
+  getProductListing,
+  getStorePageByUrl,
+  getStoreRegistration,
+  isAllowlistedProductUrl,
+} from "@/modules/demo-stores";
 import { captureStorePage } from "./evidence";
 
 export class ActorValidationError extends Error {
@@ -14,6 +20,19 @@ export class ActorValidationError extends Error {
     super(message);
     this.name = "ActorValidationError";
   }
+}
+
+/** Trusted listing for a demo-store product, taken from the store registry. */
+export function fixtureCatalogListing(storeId: string, url: string): CatalogListing | undefined {
+  const listing = getProductListing(storeId, url);
+  if (!listing) return undefined;
+  const page = getStorePageByUrl(url);
+  return {
+    source: "fixtures",
+    title: page.title,
+    category: listing.category,
+    unitPrice: { currency: "USD", amountMinor: listing.priceMinor },
+  };
 }
 
 function requireInvariant(condition: unknown, message: string): asserts condition {
@@ -27,19 +46,28 @@ export function validateProposedOrder(
   options: {
     getCapture?: (url: string) => ReturnType<typeof captureStorePage> | undefined;
     isAllowedProductUrl?: (storeId: string, url: string) => boolean;
+    getCatalogListing?: (storeId: string, url: string) => CatalogListing | undefined;
   } = {},
 ): ProposedOrder {
   const mandate = MandateSchema.parse(mandateInput);
   const parsedProposal = ProposedOrderSchema.parse(candidate);
+  const getCatalogListing = options.getCatalogListing ?? fixtureCatalogListing;
   const proposal: ProposedOrder = {
     ...parsedProposal,
     items: parsedProposal.items.map((item) => {
+      let productUrl = item.productUrl;
       try {
         // Canonicalize legacy Replay URLs to the active public demo-store origin.
-        return { ...item, productUrl: getStorePageByUrl(item.productUrl).url };
+        productUrl = getStorePageByUrl(item.productUrl).url;
       } catch {
-        return item;
+        // Not a demo-store URL (for example a Channel3 offer); keep it as supplied.
       }
+      // The listing is always attached by the server from the trusted catalog.
+      // Anything the Actor put in this field is discarded.
+      const catalogListing = getCatalogListing(item.storeId, productUrl);
+      const { catalogListing: _ignored, ...rest } = item;
+      void _ignored;
+      return { ...rest, productUrl, ...(catalogListing ? { catalogListing } : {}) };
     }),
   };
   requireInvariant(proposal.mandateId === mandate.id, "Proposal mandateId does not match the active mandate");
@@ -52,6 +80,7 @@ export function validateProposedOrder(
       (options.isAllowedProductUrl ?? isAllowlistedProductUrl)(item.storeId, item.productUrl),
       `Product URL is not an allowlisted product in store ${item.storeId}`,
     );
+    requireInvariant(item.catalogListing, `No trusted catalog listing exists for item ${item.id}`);
   }
 
   const recordsById = new Map<string, EvidenceRecord>();

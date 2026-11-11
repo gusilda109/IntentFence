@@ -45,6 +45,12 @@ export function buildApprovedOrder(
   }
 
   for (const item of selected) {
+    // Pay only the trusted catalog price, never a price the Actor wrote itself.
+    if (!item.catalogListing
+      || item.catalogListing.unitPrice.currency !== item.unitPrice.currency
+      || item.catalogListing.unitPrice.amountMinor !== item.unitPrice.amountMinor) {
+      throw new Error("PRICE_MISMATCH");
+    }
     const missingDependency = item.compatibility.some((claim) =>
       claim.withItemId !== null && !allowedIds.has(claim.withItemId));
     if (missingDependency) throw new Error("UNMET_DEPENDENCY");

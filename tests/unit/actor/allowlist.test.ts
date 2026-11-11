@@ -46,4 +46,16 @@ import {
       "http://localhost:3000/stores/tablet-hub/specs/hubtab-s10",
     )).toBe(false);
   });
+
+  it("gives every product page a trusted listing whose price matches the page", () => {
+    const products = STORE_PAGES.filter((page) => page.kind === "product");
+    expect(products.length).toBeGreaterThan(0);
+    for (const page of products) {
+      expect(page.listing, page.url).toBeDefined();
+      const shown = /Final demo price: \$(\d+(?:\.\d{2})?) USD/.exec(page.rawHtml);
+      expect(shown, page.url).not.toBeNull();
+      expect(Math.round(Number(shown![1]) * 100), page.url).toBe(page.listing!.priceMinor);
+    }
+  });
 });
+

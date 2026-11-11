@@ -70,6 +70,15 @@ export const CompatibilityClaimSchema = z.object({
   evidenceIds: z.array(IdSchema).min(1).max(20),
 }).strict();
 
+// Server-attached identity of the selected offer, copied from the trusted catalog
+// (demo store registry or Channel3 Product Detail). The Actor never authors it.
+export const CatalogListingSchema = z.object({
+  source: z.enum(["fixtures", "channel3"]),
+  title: TextSchema(300),
+  category: TextSchema(200).optional(),
+  unitPrice: MoneySchema,
+}).strict();
+
 export const ProposedOrderItemSchema = z.object({
   id: IdSchema,
   storeId: TextSchema(100),
@@ -82,6 +91,7 @@ export const ProposedOrderItemSchema = z.object({
   purpose: TextSchema(1_000),
   necessityEvidenceIds: z.array(IdSchema).min(1).max(20),
   compatibility: z.array(CompatibilityClaimSchema).max(20),
+  catalogListing: CatalogListingSchema.optional(),
 }).strict();
 
 export const ProposedOrderSchema = z.object({
@@ -106,6 +116,7 @@ export const PolicyFindingSchema = z.object({
     "PROMPT_INJECTION",
     "UNTRUSTED_EVIDENCE",
     "INVALID_ARITHMETIC",
+    "PRICE_MISMATCH",
     "UNMET_DEPENDENCY",
     "OTHER",
   ]),
@@ -231,6 +242,7 @@ export type Mandate = z.infer<typeof MandateSchema>;
 export type Evidence = z.infer<typeof EvidenceSchema>;
 export type EvidenceRecord = z.infer<typeof EvidenceRecordSchema>;
 export type SecurityReport = z.infer<typeof SecurityReportSchema>;
+export type CatalogListing = z.infer<typeof CatalogListingSchema>;
 export type ProposedOrderItem = z.infer<typeof ProposedOrderItemSchema>;
 export type ProposedOrder = z.infer<typeof ProposedOrderSchema>;
 export type PolicyFinding = z.infer<typeof PolicyFindingSchema>;
