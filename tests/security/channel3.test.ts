@@ -23,8 +23,8 @@ describe("Channel3 secret and fallback boundaries", () => {
     expect(client).not.toContain("console.");
   });
 
-  it("defaults legacy create-run input to fixtures and rejects secret fields in public contracts", () => {
-    expect(CreateRunInputSchema.parse({ goal: "tablet", budget: 10_000, constraints: [] }).catalogSource).toBe("fixtures");
+  it("defaults create-run input to Channel3 and rejects secret fields in public contracts", () => {
+    expect(CreateRunInputSchema.parse({ goal: "tablet", budget: 10_000, constraints: [] }).catalogSource).toBe("channel3");
     expect(CreateRunInputSchema.safeParse({ goal: "tablet", budget: 10_000, constraints: [], apiKey: "secret" }).success).toBe(false);
     expect("apiKey" in RunViewSchema.shape).toBe(false);
     expect("channel3ApiKey" in RunViewSchema.shape).toBe(false);

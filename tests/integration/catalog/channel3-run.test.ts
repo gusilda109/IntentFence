@@ -124,4 +124,81 @@ describe("mocked Channel3 end-to-end run", () => {
     expect(proposal.items[0].catalogListing).toMatchObject({ source: "channel3", title: "Extended warranty" });
     expect(verdict.decision).toBe("REVIEW");
   });
+
+  it("selects one affordable podcast core set and leaves the optional pop filter unapproved", async () => {
+    const catalogProduct = (
+      id: string,
+      title: string,
+      category: string,
+      price: number,
+    ): Channel3Product => product({
+      id,
+      title,
+      category: { slug: category },
+      offers: [{
+        url: `https://merchant.example/${id}`,
+        domain: "merchant.example",
+        price: { price, currency: "USD" },
+        availability: "InStock",
+      }],
+    });
+    const products = [
+      catalogProduct("mic-expensive", "D2 Podcast Pro Microphone", "microphones", 139),
+      catalogProduct("headphones-expensive", "Studio Monitoring Headphones Pro", "over-ear-headphones", 129.99),
+      catalogProduct("boom-arm", "Podcast Microphone Boom Arm", "microphone-boom-arms", 57.95),
+      catalogProduct("mic-affordable", "K688 Neo Podcast Microphone", "microphones", 38.99),
+      catalogProduct("headphones-affordable", "BH 470 Studio Headphones", "over-ear-headphones", 22.90),
+      catalogProduct("pop-filter", "Knox Gear Microphone Pop Filter", "pop-filters", 27.99),
+    ];
+    const client = {
+      search: vi.fn().mockResolvedValue(products),
+      getProduct: vi.fn().mockImplementation(async (id: string) => products.find((item) => item.id === id)!),
+    } as unknown as Channel3Client;
+    const provider = new Channel3CatalogProvider(client);
+    const mandate = {
+      ...coffeeMandate(),
+      goal: "I’m setting up a small home podcast and need a microphone and headphones for recording and monitoring.",
+      budget: { currency: "USD" as const, amountMinor: 25_000 },
+      constraints: [
+        {
+          id: "podcast-core",
+          text: "Both the microphone and headphones are essential. Don’t add an audio interface, mixer, or subscription.",
+          enforcement: "hard" as const,
+        },
+        {
+          id: "podcast-optional",
+          text: "A simple USB microphone would be ideal. A pop filter is a nice-to-have, not essential.",
+          enforcement: "soft" as const,
+        },
+      ],
+    };
+
+    const actor = createActor({ mode: "replay", catalogSource: "channel3", catalogProvider: provider });
+    const proposal = await actor.propose(mandate);
+    const evidence = await actor.getEvidence(mandate.id);
+    const verdict = await createSupervisor({ mode: "replay" }).evaluateWithEvidence(mandate, proposal, evidence);
+
+    expect(proposal.items.map((item) => item.catalogListing?.category)).toEqual([
+      "microphones",
+      "over-ear-headphones",
+      "pop-filters",
+    ]);
+    expect(proposal.items.map((item) => item.name)).toEqual([
+      "K688 Neo Podcast Microphone",
+      "BH 470 Studio Headphones",
+      "Knox Gear Microphone Pop Filter",
+    ]);
+    expect(verdict.decision).toBe("PARTIAL_ALLOW");
+    expect(verdict.itemDecisions.map((decision) => decision.decision)).toEqual([
+      "ALLOW",
+      "ALLOW",
+      "REVIEW",
+    ]);
+    const approval = buildApprovedOrder(mandate, proposal, verdict);
+    expect(approval.items.map((item) => item.name)).toEqual([
+      "K688 Neo Podcast Microphone",
+      "BH 470 Studio Headphones",
+    ]);
+    expect(approval.total.amountMinor).toBe(6_189);
+  });
 });

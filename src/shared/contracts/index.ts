@@ -233,7 +233,7 @@ export const CreateRunInputSchema = z.object({
     text: TextSchema(500),
     enforcement: z.enum(["hard", "soft"]),
   }).strict()).max(20),
-  catalogSource: CatalogSourceSchema.default("fixtures"),
+  catalogSource: CatalogSourceSchema.default("channel3"),
 }).strict();
 
 export type Money = z.infer<typeof MoneySchema>;

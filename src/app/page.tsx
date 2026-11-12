@@ -6,7 +6,7 @@ const reviewSteps = [
     icon: <EvidenceIcon />,
     number: "01",
     title: "We research the options",
-    text: "Tell us the outcome, not a product list. Live research uses Qwen to explore suitable products; demo mode uses a ready-made catalog.",
+    text: "Tell us the outcome, not a product list. We research suitable products through Channel3’s live catalog and explain the evidence behind every choice.",
   },
   {
     icon: <VerdictIcon />,

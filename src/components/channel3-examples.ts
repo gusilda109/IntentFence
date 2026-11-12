@@ -34,18 +34,17 @@ export const CHANNEL3_EXAMPLES: readonly Channel3Example[] = [
   },
   {
     id: "home-podcast-microphone",
-    label: "Podcast starter · PARTIAL_ALLOW · Replay",
-    goal: "I’m starting a small podcast at home",
+    label: "Podcast starter · PARTIAL_ALLOW",
+    goal: "I’m setting up a small home podcast and need a microphone and headphones for recording and monitoring.",
     budget: "250",
     expectedVerdict: "PARTIAL_ALLOW",
-    requiresReplay: true,
     constraints: [
       {
-        text: "The microphone is the essential purchase. Don’t add an audio interface, pop filter, stand, or subscription unless it’s strictly required for basic recording.",
+        text: "Both the microphone and headphones are essential. Don’t add an audio interface, mixer, or subscription.",
         enforcement: "hard",
       },
       {
-        text: "A simple USB setup would be ideal.",
+        text: "A simple USB microphone would be ideal. A pop filter is a nice-to-have, not essential.",
         enforcement: "soft",
       },
     ],

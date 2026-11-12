@@ -23,6 +23,7 @@ export class ActorEvidenceSession {
       this.listings.set(candidate.capture.url, {
         source: "channel3",
         title: candidate.product.title.slice(0, 300),
+        ...(candidate.product.category ? { category: candidate.product.category.slice(0, 200) } : {}),
         unitPrice: { currency: "USD", amountMinor: candidate.product.amountMinor },
       });
     }

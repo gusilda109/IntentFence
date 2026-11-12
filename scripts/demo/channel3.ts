@@ -5,9 +5,18 @@ import {
   RunViewSchema,
   type RunView,
 } from "../../src/shared/contracts/index.js";
+import { CHANNEL3_EXAMPLES } from "../../src/components/channel3-examples.js";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 const REQUEST_TIMEOUT_MS = 120_000;
+
+function getExample() {
+  const example = CHANNEL3_EXAMPLES.find((candidate) => candidate.id === "home-office-mouse");
+  if (!example) throw new Error("The home-office-mouse Channel3 example is missing.");
+  return example;
+}
+
+const EXAMPLE = getExample();
 
 class DemoError extends Error {}
 
@@ -68,9 +77,10 @@ async function createRun(baseUrl: string): Promise<RunView> {
         "Idempotency-Key": randomUUID(),
       },
       body: JSON.stringify({
-        goal: "Организуй кассу кофейни на базе планшета",
-        budget: 80_000,
-        constraints: [],
+        goal: EXAMPLE.goal,
+        budget: Math.round(Number(EXAMPLE.budget) * 100),
+        constraints: EXAMPLE.constraints,
+        catalogSource: "channel3",
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -134,8 +144,11 @@ async function main() {
   console.log(`PayPal order status: ${paypalStatus}${run.replay && run.payment ? " (simulated)" : ""}`);
   if (run.payment?.approveUrl) console.log(`Approve URL: ${run.payment.approveUrl}`);
 
-  if (run.verdict?.decision !== "PARTIAL_ALLOW") {
-    throw new DemoError("Demo failed: expected PARTIAL_ALLOW for the coffee scenario.");
+  if (run.catalogSource !== "channel3") {
+    throw new DemoError("Demo failed: expected the Channel3 catalog source.");
+  }
+  if (run.verdict?.decision !== "ALLOW") {
+    throw new DemoError("Demo failed: expected ALLOW for the home-office mouse scenario.");
   }
   if (run.payment?.status !== "PAYPAL_CREATED" || paypalStatus !== "CREATED") {
     throw new DemoError("Demo failed: expected a CREATED PayPal order.");

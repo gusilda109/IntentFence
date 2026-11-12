@@ -4,23 +4,22 @@
 
 ## 1. Подготовка
 
-- [ ] Скопируйте `.env.example` в локальный `.env` и заполните Sandbox credentials только на своей машине.
+- [ ] Скопируйте `.env.example` в локальный `.env` и заполните `CHANNEL3_API_KEY` и Sandbox credentials только на своей машине.
 - [ ] Убедитесь, что PayPal API base URL указывает на Sandbox, а `APP_MODE=live` и `PAYPAL_MODE=live`.
 - [ ] Выполните установку, Prisma migration и запустите приложение в отдельном терминале. Demo script сам сервер не запускает.
-- [ ] Перед Live smoke отдельно проверьте Replay: UI и вывод script должны явно содержать `Replay` и `simulated`.
+- [ ] Перед Live smoke отдельно проверьте Replay: UI и вывод script должны явно содержать `Replay` и `simulated`. Поиск товаров в обоих режимах идёт через Channel3.
 
 ```bash
 INTENTGUARD_BASE_URL=http://127.0.0.1:3000 npm run demo
 ```
 
-## 2. Coffee $800
+## 2. Home office mouse
 
-- [ ] Запустите coffee demo против Live API с новым `Idempotency-Key` (script генерирует его автоматически).
+- [ ] Запустите Channel3 demo против Live API с новым `Idempotency-Key` (script генерирует его автоматически).
 - [ ] Вывод начинается с `Mode: Live`; нет утверждения, что результат simulated.
-- [ ] Run ID имеет UUID-формат; verdict — `PARTIAL_ALLOW`.
-- [ ] В заказе три ALLOW equipment item: tablet, receipt printer и interface adapter.
-- [ ] `Calibration License` имеет item-level `BLOCK`; findings объясняют seller-only necessity и prompt-injection quarantine.
-- [ ] ApprovedOrder содержит только три ALLOW item, а total не превышает `80000` minor units.
+- [ ] Run ID имеет UUID-формат; verdict — `ALLOW`.
+- [ ] В ProposedOrder и ApprovedOrder содержится подходящая беспроводная мышь без навязанных дополнений.
+- [ ] Итоговая сумма ApprovedOrder не превышает `5000` minor units.
 - [ ] PayPal status — `CREATED`; UI не называет заказ оплаченным или completed.
 - [ ] Approve URL ведёт на PayPal Sandbox. Не выполняйте capture: он не входит в MVP.
 
@@ -40,8 +39,10 @@ curl --fail-with-body --request POST \
 
 ## 4. Негативные проверки
 
-- [ ] Over-budget coffee run завершается `BLOCK`; execute возвращает `409 RUN_NOT_APPROVABLE`.
-- [ ] Hard constraint с обязательным человеческим review завершается `REVIEW`; execute возвращает `409 RUN_NOT_APPROVABLE`.
+Следующие coffee-сценарии используют локальные fixtures только как внутренние регрессионные тесты; в пользовательском интерфейсе доступен только Channel3.
+
+- [ ] Внутренний over-budget coffee run завершается `BLOCK`; execute возвращает `409 RUN_NOT_APPROVABLE`.
+- [ ] Внутренний fixture-run с hard constraint на обязательное человеческое review завершается `REVIEW`; execute возвращает `409 RUN_NOT_APPROVABLE`.
 - [ ] В server telemetry для BLOCK/REVIEW нет OAuth- или Orders API-вызовов. Не копируйте логи с чувствительными значениями в репозиторий.
 - [ ] `GET /api/health` возвращает только `{ "status": "ok" }`; API и browser source не раскрывают env, tokens или полный PayPal response.
 - [ ] Capture route отсутствует; UI содержит mandate, items, Evidence Timeline, Verdict и PayPal Status, но не chat.

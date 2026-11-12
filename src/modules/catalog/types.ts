@@ -4,6 +4,7 @@ import type { TrustedCapture } from "@/modules/actor/evidence";
 export interface CatalogProductSnapshot {
   productId: string;
   title: string;
+  category?: string;
   description: string;
   productUrl: string;
   merchant: string;

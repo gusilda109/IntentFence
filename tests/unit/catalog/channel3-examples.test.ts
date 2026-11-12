@@ -22,8 +22,14 @@ describe("real Channel3 demo examples", () => {
     }
   });
 
-  it("marks the modes needed for the two mode-sensitive verdicts", () => {
-    expect(CHANNEL3_EXAMPLES.find((example) => example.expectedVerdict === "PARTIAL_ALLOW")?.requiresReplay).toBe(true);
+  it("marks the mode-sensitive BLOCK example and defines a useful podcast subset", () => {
     expect(CHANNEL3_EXAMPLES.find((example) => example.expectedVerdict === "BLOCK")?.requiresLive).toBe(true);
+    const podcast = CHANNEL3_EXAMPLES.find((example) => example.id === "home-podcast-microphone");
+    expect(podcast?.expectedVerdict).toBe("PARTIAL_ALLOW");
+    expect(podcast?.goal).toMatch(/microphone and headphones/i);
+    expect(podcast?.constraints.find((constraint) => constraint.enforcement === "hard")?.text)
+      .toMatch(/both the microphone and headphones are essential/i);
+    expect(podcast?.constraints.find((constraint) => constraint.enforcement === "soft")?.text)
+      .toMatch(/pop filter is a nice-to-have, not essential/i);
   });
 });

@@ -6,7 +6,6 @@ test.skip(process.env.CHANNEL3_UI_LIVE_SMOKE !== "1", "Explicit opt-in is requir
 
 test("Channel3 UI run creates an uncaptured PayPal Sandbox order", async ({ page }) => {
   await page.goto("/");
-  await page.getByTestId("catalog-source-channel3").click();
   await page.getByTestId("goal-input").fill("Buy a tablet");
   await page.getByTestId("budget-input").fill("800");
 

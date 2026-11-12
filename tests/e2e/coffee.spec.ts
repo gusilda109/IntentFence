@@ -1,28 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { RunViewSchema } from "../../src/shared/contracts/index.js";
-import { executeRun, expectNoChat, expectRunRegions } from "./support.js";
+import { createRun, executeRun, expectNoChat, expectRunRegions } from "./support.js";
 
 test("coffee $800 replay allows viable equipment, blocks the infected seller-only upsell, and retries safely", async ({
   page,
   request,
 }) => {
-  await page.goto("/");
-
-  await expect(page.getByTestId("mandate-form")).toBeVisible();
-  await page.getByTestId("goal-input").fill("Организуй кассу кофейни на базе планшета");
-  await page.getByTestId("budget-input").fill("800");
-
-  const createResponsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      new URL(response.url()).pathname === "/api/runs",
-  );
-  await page.getByTestId("submit-run").click();
-
-  const createResponse = await createResponsePromise;
-  expect(createResponse.status(), await createResponse.text()).toBe(201);
-  const run = RunViewSchema.parse(await createResponse.json());
+  const run = await createRun(request);
+  await page.goto(`/runs/${run.id}`);
 
   expect(run.id).toMatch(/^[0-9a-f-]{36}$/i);
   expect(run.replay).toBe(true);
@@ -137,6 +123,7 @@ test("POST /api/runs reuses the same replay run for the same idempotency key and
     goal: "Организуй кассу кофейни на базе планшета",
     budget: 80_000,
     constraints: [],
+    catalogSource: "fixtures",
   };
   const headers = { "Idempotency-Key": idempotencyKey };
 

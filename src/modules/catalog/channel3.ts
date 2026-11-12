@@ -98,6 +98,7 @@ export function normalizeProduct(product: Channel3Product): CatalogProductSnapsh
     return [{
       productId: product.id,
       title: product.title,
+      ...(product.category ? { category: product.category.slug } : {}),
       description: product.description ?? "",
       productUrl: offer.url,
       merchant: offer.domain,
@@ -156,6 +157,7 @@ function toCandidate(product: CatalogProductSnapshot): CatalogCandidate {
 export function visibleSnapshot(product: CatalogProductSnapshot): string {
   return [
     `Title: ${clip(product.title, 500)}`,
+    ...(product.category ? [`Category: ${clip(product.category, 200)}`] : []),
     `Merchant offer: ${clip(product.merchant, 200)} | USD ${(product.amountMinor / 100).toFixed(2)} | InStock | ${product.productUrl}`,
     `Description: ${clip(product.description || "Not supplied", 1_200)}`,
     `Selected variant: ${clip(JSON.stringify(product.selectedVariant.slice(0, 20)), 500)}`,
@@ -167,6 +169,7 @@ function canonicalSnapshot(product: CatalogProductSnapshot) {
   return {
     productId: product.productId,
     title: clip(product.title, 500),
+    ...(product.category ? { category: clip(product.category, 200) } : {}),
     description: clip(product.description, 1_200),
     offer: {
       url: product.productUrl,

@@ -1,16 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { RunViewSchema } from "../../src/shared/contracts/index.js";
 import { CHANNEL3_EXAMPLES } from "../../src/components/channel3-examples.js";
+import { createRun } from "./support.js";
 
-test("every real Channel3 example fills its mandate and selects the live catalog", async ({ page }) => {
+test("Channel3 is the only product source and every real example fills its mandate", async ({ page }) => {
   await page.goto("/");
-  const fixtures = page.getByTestId("catalog-source-fixtures");
-  const channel3 = page.getByTestId("catalog-source-channel3");
-  await expect(fixtures).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("catalog-source-channel3")).toHaveText("Live products · Channel3");
+  await expect(page.getByTestId("catalog-source-fixtures")).toHaveCount(0);
 
   for (const example of CHANNEL3_EXAMPLES) {
     await page.getByTestId(`channel3-example-${example.id}`).click();
-    await expect(channel3).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("goal-input")).toHaveValue(example.goal);
     await expect(page.getByTestId("budget-input")).toHaveValue(example.budget);
     await expect(page.locator(".constraint-row")).toHaveCount(example.constraints.length);
@@ -19,7 +18,6 @@ test("every real Channel3 example fills its mandate and selects the live catalog
 
 test("unconfigured Channel3 returns a readable error without fixture fallback", async ({ page }) => {
   await page.goto("/");
-  await page.getByTestId("catalog-source-channel3").click();
   await page.getByTestId("goal-input").fill("Buy a point of sale tablet");
   await page.getByTestId("budget-input").fill("800");
 
@@ -35,20 +33,16 @@ test("unconfigured Channel3 returns a readable error without fixture fallback", 
   expect(JSON.stringify(payload)).not.toContain("x-api-key");
   await expect(page.locator(".form-error")).toContainText("Channel3 is not configured");
   await expect(page).toHaveURL("/");
-  await expect(page.getByTestId("catalog-source-channel3")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("catalog-source-channel3")).toBeVisible();
 });
 
-test("fixture run persists and displays its selected catalog source", async ({ page, request }) => {
-  await page.goto("/");
-  await page.getByTestId("goal-input").fill("Set up a coffee shop checkout based on a tablet");
-  await page.getByTestId("budget-input").fill("800");
-  await page.getByTestId("submit-run").click();
-  await expect(page).toHaveURL(/\/runs\//);
+test("a saved fixture run remains readable as an internal regression fixture", async ({ page, request }) => {
+  const run = await createRun(request);
+  await page.goto(`/runs/${run.id}`);
   await expect(page.getByTestId("catalog-source-result")).toHaveText("Demo fixtures");
   await expect(page.getByTestId("evidence-timeline")).toContainText("Catalog: Demo fixtures");
 
-  const runId = page.url().split("/").at(-1)!;
-  const response = await request.get(`/api/runs/${runId}`);
-  const run = RunViewSchema.parse(await response.json());
-  expect(run.catalogSource).toBe("fixtures");
+  const response = await request.get(`/api/runs/${run.id}`);
+  const persistedRun = RunViewSchema.parse(await response.json());
+  expect(persistedRun.catalogSource).toBe("fixtures");
 });

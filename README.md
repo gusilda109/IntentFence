@@ -1,6 +1,6 @@
 # IntentGuard
 
-A PayPal-native service for validating autonomous purchases. IntentGuard accepts an open-ended user mandate, explores local demo fixtures or the live Channel3 catalog, builds an Evidence Timeline, and creates a **real PayPal Orders v2 Sandbox Order** only after deterministic approval. Capture, refunds, and actual payments are not performed.
+A PayPal-native service for validating autonomous purchases. IntentGuard accepts an open-ended user mandate, researches real products through Channel3, builds an Evidence Timeline, and creates a **real PayPal Orders v2 Sandbox Order** only after deterministic approval. Capture, refunds, and actual payments are not performed.
 
 **Live demo:** https://intentguard.gehrman.me (no login required)
 
@@ -23,7 +23,7 @@ A PayPal-native service for validating autonomous purchases. IntentGuard accepts
 
 **Channel3 (sponsor integration)**
 
-- The `Channel3 · live data` catalog source uses the Channel3 **Search** and **Product Detail** APIs to research real products.
+- Channel3 is the only user-facing product source. Its **Search** and **Product Detail** APIs research real products for every new run.
 - Channel3 data is classified as an `aggregator` source. It is never treated as manufacturer or independent evidence, and commission rates never affect the verdict.
 - Selected offers are revalidated before approval. On any Channel3 error, the run stops with a readable error instead of silently falling back to demo data.
 
@@ -31,7 +31,7 @@ A PayPal-native service for validating autonomous purchases. IntentGuard accepts
 
 ## Architecture and Guarantees
 
-- **CatalogProvider** — selects `FixtureCatalogProvider` or `Channel3CatalogProvider` independently of `APP_MODE` and `PAYPAL_MODE`. Channel3 uses only Search and Product Detail; selected offers are revalidated before the verdict.
+- **CatalogProvider** — uses `Channel3CatalogProvider` for product runs. `FixtureCatalogProvider` remains available only to internal tests and older saved runs. Channel3 uses only Search and Product Detail; selected offers are revalidated before the verdict.
 - **Actor** — uses the OpenAI Agents SDK, a read-only snapshot of the selected catalog, and a structured draft. The server creates trusted EvidenceRecords from verbatim excerpts and builds a `ProposedOrder`. In Replay mode, Channel3 uses a deterministic Actor without local fixtures.
 - **Supervisor + Policy Engine** — a separate OpenAI Agent for semantic evaluation, plus deterministic checks for the budget, evidence graph, publisher independence, prompt-injection quarantine, and dependency closure.
 - **Approval Builder** — plain TypeScript without an LLM; selects only item-level `ALLOW` decisions, recalculates the total, and creates an immutable `ApprovedOrder` with a hash and idempotency key.
@@ -46,6 +46,7 @@ For `BLOCK` and `REVIEW`, the Executor is not invoked: neither OAuth nor the Ord
 - Node.js 24 or a compatible current LTS release;
 - npm;
 - Chromium for Playwright (`npx playwright install chromium`);
+- a Channel3 API key for every new product-research run;
 - for Live mode: an OpenAI API key and PayPal **Sandbox** REST app credentials.
 
 ## Installation
@@ -55,7 +56,7 @@ npm install
 npm run dev
 ```
 
-No `.env` file is required for a local preview: development defaults to Replay mode and `DATABASE_URL=file:./dev.db`, with migrations applied automatically. For Live mode, copy `.env.example` to `.env` and fill in the credentials.
+Development defaults to Replay mode and `DATABASE_URL=file:./dev.db`, with migrations applied automatically. The home page can be previewed without configuration, but starting a purchase requires a server-side `CHANNEL3_API_KEY`. Copy `.env.example` to `.env` and fill in that key; Live mode additionally needs the OpenAI and PayPal Sandbox credentials.
 
 The following commands are available when changing the schema manually:
 
@@ -69,8 +70,8 @@ npm run db:migrate
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | SQLite URL; defaults to `file:./dev.db`. |
-| `APP_BASE_URL` | Public HTTP(S) origin for demo fixture links. Optional on Render, where `RENDER_EXTERNAL_URL` is detected automatically; otherwise defaults to `http://localhost:3000`. |
-| `APP_MODE` | `live` — real Actor/Supervisor and PayPal; `replay` — stored deterministic agent fixtures. |
+| `APP_BASE_URL` | Public HTTP(S) origin for internal test-fixture links. Optional on Render, where `RENDER_EXTERNAL_URL` is detected automatically; otherwise defaults to `http://localhost:3000`. |
+| `APP_MODE` | `live` — real Actor/Supervisor and PayPal Sandbox; `replay` — deterministic Channel3 research and simulated PayPal. |
 | `OPENAI_API_KEY` | Used only by the Live Actor/Supervisor. Never sent to the browser. |
 | `OPENAI_BASE_URL` | Any OpenAI-compatible base URL serving the configured models. Our deployment uses Qwen at `https://deepcode.ci.nsu.ru/api`; the SDK appends `/chat/completions`. |
 | `OPENAI_MODEL_ACTOR` | Live Actor model, for example `Qwen3.8-27B`. |
@@ -80,10 +81,10 @@ npm run db:migrate
 | `PAYPAL_CLIENT_SECRET` | Secret of the PayPal Sandbox REST app. Read only within the Payment Executor server boundary. |
 | `PAYPAL_API_BASE_URL` | `https://api-m.sandbox.paypal.com`; production endpoints are rejected. |
 | `PAYPAL_TIMEOUT_MS` | Sandbox HTTP timeout; defaults to `15000`. |
-| `CHANNEL3_API_KEY` | Required only for the `Channel3 · live data` source; read exclusively by the server-side Channel3 client. |
+| `CHANNEL3_API_KEY` | Required for every new product-research run; read exclusively by the server-side Channel3 client. |
 | `CHANNEL3_TIMEOUT_MS` | Timeout for a single Channel3 HTTP request; defaults to `10000`, maximum `60000`. |
 
-Never commit `.env`. Live mode neither needs nor uses mock PayPal responses. Replay mode requires no OpenAI/PayPal credentials, and the UI explicitly labels the PayPal result as simulated. Channel3 in Replay mode requires only `CHANNEL3_API_KEY`.
+Never commit `.env`. Live mode neither needs nor uses mock PayPal responses. Replay mode requires no OpenAI/PayPal credentials, and the UI explicitly labels the PayPal result as simulated. Both Replay and Live require `CHANNEL3_API_KEY` for product research.
 
 ## Running the Replay Demo
 
@@ -91,13 +92,11 @@ Never commit `.env`. Live mode neither needs nor uses mock PayPal responses. Rep
 npm run dev
 ```
 
-Replay is selected automatically in development. No explicit configuration is required; if desired, you can pin it in `.env` with `APP_MODE="replay"`, `PAYPAL_MODE="mock"`, and `DATABASE_URL="file:./dev.db"`.
+Replay is selected automatically in development. Set `CHANNEL3_API_KEY` in `.env`; if desired, you can also pin `APP_MODE="replay"`, `PAYPAL_MODE="mock"`, and `DATABASE_URL="file:./dev.db"`.
 
-Open `http://localhost:3000` and enter the goal “Set up a coffee shop checkout based on a tablet” with a budget of `800`. The scenario explores Tablet Hub, POS Supply, Maker Docs, and Checkout Bundles. The expected result is `PARTIAL_ALLOW`: the tablet, compatible printer, and adapter are allowed; the seller-only `Calibration License` for $99 with quarantined prompt injection is blocked. The approved subset creates one simulated Replay Order with a stored request ID.
+Open `http://localhost:3000` and choose **Home office mouse · ALLOW**, or enter your own goal and USD budget. The preset researches a real wireless mouse through Channel3 and creates one simulated Replay Order after approval. Local coffee/printer fixtures remain only in automated tests and for reading older saved runs; they are not a user-selectable catalog.
 
-Demo pages are available under `/stores/...`; the infected fixture page is visually marked for the operator, while the hidden instruction exists only in the raw HTML.
-
-Run the CLI scenario against an already running server:
+Run the same Channel3 scenario through the CLI against an already running server:
 
 ```bash
 npm run demo -- --base-url http://localhost:3000
@@ -114,9 +113,9 @@ CHANNEL3_API_KEY="..."
 CHANNEL3_TIMEOUT_MS="10000"
 ```
 
-2. Run `npm run dev`, select `Channel3 · live data`, and enter an open-ended goal and a USD budget. In Replay mode, research and the Policy Engine are deterministic, while PayPal remains simulated; in Live mode, the LLM Actor/Supervisor and PayPal Sandbox are used according to their respective settings.
+2. Run `npm run dev` and enter an open-ended goal and a USD budget. Channel3 is always the product source. In Replay mode, research and the Policy Engine are deterministic, while PayPal remains simulated; in Live mode, the LLM Actor/Supervisor and PayPal Sandbox are used according to their respective settings.
 
-   The home page includes four human-readable Channel3 presets: a home-office mouse for `ALLOW`, a home podcast starter for `PARTIAL_ALLOW` in Replay, a MacBook requirement conflict for `BLOCK` in Live, and an open-ended audio problem for `REVIEW`. These labels describe the verified demo mode rather than forcing a verdict; live catalog results can change.
+   The home page includes four human-readable Channel3 presets: a home-office mouse for `ALLOW`, a home podcast starter for `PARTIAL_ALLOW`, a MacBook requirement conflict for `BLOCK` in Live, and an open-ended audio problem for `REVIEW`. The podcast preset approves the essential microphone and headphones while leaving the optional pop filter for review. These labels describe verified behavior rather than forcing a verdict; live catalog results can change.
 
 3. On the run page, check the `Channel3 · live data` badge and the Evidence Timeline with the `Aggregator` class. Channel3 is never assigned manufacturer or independent-reference status, and the commission rate does not affect ranking or the verdict.
 
@@ -148,7 +147,7 @@ npm run db:deploy
 npm run dev
 ```
 
-4. Run the coffee demo. In Live mode, the Actor and Supervisor call the OpenAI Agents SDK, and the Payment Executor creates a real Sandbox Order through the Orders v2 REST API. Repeating `execute` must return the same order ID. There is no capture endpoint.
+4. Run the Channel3 home-office mouse demo. In Live mode, the Actor and Supervisor call the OpenAI Agents SDK, and the Payment Executor creates a real Sandbox Order through the Orders v2 REST API. Repeating `execute` must return the same order ID. There is no capture endpoint.
 
 A manual checklist for ALLOW/BLOCK/REVIEW and sequential/parallel retries is available in `scripts/demo/live-sandbox.md`. After a smoke test, record only safe order IDs, statuses, and request IDs—never credentials or access tokens. The Live smoke test runs only after local `.env` configuration and is not included in the automated test suite.
 
@@ -165,7 +164,7 @@ npm run build
 
 `npm test` includes unit, integration, and security tests: contracts, seller-only necessity, renamed upsells and other product domains, injection quarantine, the dependency matrix, Sandbox payloads, minor-unit arithmetic, tampered approvals, zero OAuth/Orders calls for invalid decisions, sequential retries, and 10 parallel retries.
 
-Playwright automatically applies migrations to a separate `e2e.db` and starts and stops the test server. E2E coverage includes coffee `PARTIAL_ALLOW`, the UI in all five areas, safe `CREATED`, repeated execution, run idempotency/conflicts, `BLOCK`, and `REVIEW`.
+Playwright automatically applies migrations to a separate `e2e.db` and starts and stops the test server. E2E coverage uses internal coffee/printer fixtures for deterministic `PARTIAL_ALLOW`, `BLOCK`, and `REVIEW` regression checks, plus the Channel3-only form, all five UI areas, safe `CREATED`, repeated execution, and run idempotency/conflicts.
 
 Production build and startup:
 
@@ -176,14 +175,14 @@ npm run start
 
 ## API
 
-- `POST /api/runs` — requires `Idempotency-Key` and JSON `{ goal, budget, constraints, catalogSource }`; the budget is passed in integer minor units, and `catalogSource` is `fixtures` (default) or `channel3`.
+- `POST /api/runs` — requires `Idempotency-Key` and JSON `{ goal, budget, constraints, catalogSource }`; the budget is passed in integer minor units. `catalogSource` defaults to `channel3`; `fixtures` is retained for internal regression tests and compatibility with older saved runs.
 - `GET /api/runs/:runId` — returns a safe `RunView` without raw HTML, prompts, credentials, or the full PayPal response.
 - `POST /api/runs/:runId/execute` — idempotently executes the stored `ApprovedOrder`.
 - `GET /api/health` — returns only `{ "status": "ok" }`.
 
 ## MVP Limitations
 
-USD only, final prices of selected offers only, one purchase unit, and no taxes, shipping, capture, refunds, or webhooks. Replay with fixtures supports stored coffee/printer inputs; open-ended goals in Replay are available through Channel3, while fixtures require Live mode. Render deployment is not configured. An old `PAYMENT_UNKNOWN` outside the PayPal idempotency window requires manual reconciliation rather than automatic creation of a new Order.
+USD only, final prices of selected offers only, one purchase unit, and no taxes, shipping, capture, refunds, or webhooks. New product research requires Channel3 in both Replay and Live; local coffee/printer fixtures are internal regression inputs only. Render deployment is not configured. An old `PAYMENT_UNKNOWN` outside the PayPal idempotency window requires manual reconciliation rather than automatic creation of a new Order.
 
 ## License
 

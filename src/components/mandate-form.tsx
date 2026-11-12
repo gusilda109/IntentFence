@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { RunViewSchema, type CatalogSource, type CreateRunInput } from "@/shared/contracts";
+import { RunViewSchema, type CreateRunInput } from "@/shared/contracts";
 import type { ApiError } from "@/shared/views";
 import { ArrowRightIcon, PlusIcon, ShieldCheckIcon, SparkIcon, TrashIcon } from "@/components/icons";
 import { CHANNEL3_EXAMPLES, type Channel3Example } from "@/components/channel3-examples";
@@ -50,12 +50,10 @@ export function MandateForm() {
   const [goal, setGoal] = useState("");
   const [budget, setBudget] = useState("");
   const [constraints, setConstraints] = useState<ConstraintDraft[]>([]);
-  const [catalogSource, setCatalogSource] = useState<CatalogSource>("fixtures");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function loadChannel3Example(example: Channel3Example) {
-    setCatalogSource("channel3");
     setGoal(example.goal);
     setBudget(example.budget);
     setConstraints(example.constraints.map((constraint) =>
@@ -90,7 +88,7 @@ export function MandateForm() {
       goal: trimmedGoal,
       budget: amountMinor,
       constraints: constraints.map(({ text, enforcement }) => ({ text: text.trim(), enforcement })),
-      catalogSource,
+      catalogSource: "channel3",
     };
     const serializedBody = JSON.stringify(input);
     if (operationRef.current?.body !== serializedBody) {
@@ -148,7 +146,7 @@ export function MandateForm() {
             className="text-area goal-input"
             value={goal}
             onChange={(event) => setGoal(event.target.value)}
-            placeholder="For example: I need a simple checkout setup for my coffee shop…"
+            placeholder="For example: I need a comfortable wireless mouse for my home office…"
             maxLength={2000}
             rows={4}
             required
@@ -180,34 +178,15 @@ export function MandateForm() {
           <p id="budget-help" className="field-help">We’ll keep the final order total at or below this amount.</p>
         </div>
 
-        <fieldset className="catalog-source-field" disabled={submitting}>
-          <legend className="field-label">Where should we look?</legend>
-          <div className="catalog-source-control" role="group" aria-label="Where should we look?">
-            <button
-              type="button"
-              className={catalogSource === "fixtures" ? "is-selected" : ""}
-              aria-pressed={catalogSource === "fixtures"}
-              data-testid="catalog-source-fixtures"
-              onClick={() => { setCatalogSource("fixtures"); setError(null); }}
-            >
-              Demo catalog
-            </button>
-            <button
-              type="button"
-              className={catalogSource === "channel3" ? "is-selected" : ""}
-              aria-pressed={catalogSource === "channel3"}
-              data-testid="catalog-source-channel3"
-              onClick={() => { setCatalogSource("channel3"); setError(null); }}
-            >
-              Live products · Channel3
-            </button>
+        <div className="catalog-source-field">
+          <span className="field-label">Product source</span>
+          <div className="catalog-source-static" data-testid="catalog-source-channel3">
+            Live products · Channel3
           </div>
           <p className="field-help">
-            {catalogSource === "fixtures"
-              ? "Explore a ready-made catalog without any external product requests."
-              : "Research live products through Channel3. If the service is unavailable, we’ll show the error rather than switch catalogs."}
+            Research live products through Channel3. If the service is unavailable, we’ll show the error rather than switch catalogs.
           </p>
-        </fieldset>
+        </div>
 
         <fieldset className="constraints-fieldset" disabled={submitting}>
           <legend className="field-label">Any must-haves or preferences? <span>(optional)</span></legend>

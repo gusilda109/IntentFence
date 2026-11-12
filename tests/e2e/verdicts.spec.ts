@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { RunViewSchema } from "../../src/shared/contracts/index.js";
 import {
   coffeeInput,
   createRun,
@@ -116,19 +115,15 @@ test("the incompatible printer demo blocks payment with manufacturer evidence", 
   page,
   request,
 }) => {
-  await page.goto("/");
-  await page.getByTestId("goal-input").fill("Set up receipt printing for my existing HubTab S10 tablet.");
-  await page.getByTestId("budget-input").fill("250");
-
-  const createResponsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      new URL(response.url()).pathname === "/api/runs",
-  );
-  await page.getByTestId("submit-run").click();
-  const createResponse = await createResponsePromise;
-  expect(createResponse.status(), await createResponse.text()).toBe(201);
-  const run = RunViewSchema.parse(await createResponse.json());
+  const run = await createRun(request, coffeeInput({
+    goal: "Set up receipt printing for my existing HubTab S10 tablet.",
+    budget: 25_000,
+    constraints: [{
+      text: "The printer must be compatible with my existing HubTab S10 tablet.",
+      enforcement: "hard",
+    }],
+  }));
+  await page.goto(`/runs/${run.id}`);
 
   expect(run.replay).toBe(true);
   expect(run.status).toBe("BLOCKED");
@@ -138,7 +133,6 @@ test("the incompatible printer demo blocks payment with manufacturer evidence", 
   expect(run.approvedOrder).toBeNull();
   expect(run.payment).toBeNull();
 
-  await expect(page).toHaveURL(new RegExp(`/runs/${run.id}$`));
   await expectRunRegions(page);
   await expectNoChat(page);
   await expect(page.getByTestId("order-items")).toContainText("RP-90 Serial Receipt Printer");

@@ -1,12 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { RunViewSchema } from "../../src/shared/contracts/index.js";
-import { expectRunRegions } from "./support.js";
-
-async function loadCoffeeReplay(page: Page) {
-  await page.getByTestId("catalog-source-fixtures").click();
-  await page.getByTestId("goal-input").fill("Set up a coffee shop checkout based on a tablet");
-  await page.getByTestId("budget-input").fill("800");
-}
+import { createRun, expectRunRegions } from "./support.js";
 
 function createRunResponse(page: Page) {
   return page.waitForResponse(
@@ -23,7 +16,7 @@ async function expectNoHorizontalOverflow(page: Page) {
   })).toBeLessThanOrEqual(0);
 }
 
-test("desktop home exposes the human entry and starts the coffee replay", async ({ page }) => {
+test("desktop home exposes the human entry and a saved run dashboard", async ({ page, request }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", {
@@ -39,7 +32,6 @@ test("desktop home exposes the human entry and starts the coffee replay", async 
 
   for (const testId of [
     "mandate-form",
-    "catalog-source-fixtures",
     "catalog-source-channel3",
     "goal-input",
     "budget-input",
@@ -51,25 +43,15 @@ test("desktop home exposes the human entry and starts the coffee replay", async 
   ]) {
     await expect(page.getByTestId(testId)).toBeVisible();
   }
-
-  const submit = page.getByTestId("submit-run");
+  await expect(page.getByTestId("catalog-source-fixtures")).toHaveCount(0);
   await expect(page.getByRole("button", {
     name: "Review my purchase",
     exact: true,
   })).toBeVisible();
 
-  await loadCoffeeReplay(page);
-  await expect(page.getByTestId("goal-input")).toHaveValue(/coffee shop/i);
-  await expect(page.getByTestId("budget-input")).toHaveValue("800");
-
-  const responsePromise = createRunResponse(page);
-  await submit.click();
-  const response = await responsePromise;
-  expect(response.status(), await response.text()).toBe(201);
-  const run = RunViewSchema.parse(await response.json());
+  const run = await createRun(request);
   expect(run.replay).toBe(true);
-
-  await expect(page).toHaveURL(new RegExp(`/runs/${run.id}$`));
+  await page.goto(`/runs/${run.id}`);
   await expect(page.getByRole("heading", {
     name: "Your purchase review",
     exact: true,
@@ -89,7 +71,7 @@ test("desktop home exposes the human entry and starts the coffee replay", async 
   await expectRunRegions(page);
 });
 
-test("mobile home and coffee run stay within the viewport and keep controls usable", async ({ page }) => {
+test("mobile home and saved run stay within the viewport and keep controls usable", async ({ page, request }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
@@ -108,18 +90,13 @@ test("mobile home and coffee run stay within the viewport and keep controls usab
   await expect(submit).toBeVisible();
   await expect(submit).toBeEnabled();
 
-  await loadCoffeeReplay(page);
-  await expect(goal).toHaveValue(/coffee shop/i);
-  await expect(budget).toHaveValue("800");
+  await channel3Example.click();
+  await expect(goal).toHaveValue(/mouse/i);
+  await expect(budget).toHaveValue("50");
 
-  const responsePromise = createRunResponse(page);
-  await submit.click();
-  const response = await responsePromise;
-  expect(response.status(), await response.text()).toBe(201);
-  const run = RunViewSchema.parse(await response.json());
+  const run = await createRun(request);
   expect(run.replay).toBe(true);
-
-  await expect(page).toHaveURL(new RegExp(`/runs/${run.id}$`));
+  await page.goto(`/runs/${run.id}`);
   await expectRunRegions(page);
   await expectNoHorizontalOverflow(page);
 
@@ -137,7 +114,8 @@ test("mobile home and coffee run stay within the viewport and keep controls usab
   await expectNoHorizontalOverflow(page);
 });
 
-test("a delayed create request keeps submit disabled and does not duplicate the POST", async ({ page }) => {
+test("a delayed create request keeps submit disabled and does not duplicate the POST", async ({ page, request }) => {
+  const run = await createRun(request);
   let createPostCount = 0;
   let releaseCreate!: () => void;
   const createDelay = new Promise<void>((resolve) => {
@@ -151,11 +129,15 @@ test("a delayed create request keeps submit disabled and does not duplicate the 
     }
     createPostCount += 1;
     await createDelay;
-    await route.continue();
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify(run),
+    });
   });
 
   await page.goto("/");
-  await loadCoffeeReplay(page);
+  await page.getByTestId("channel3-example-home-office-mouse").click();
   const submit = page.getByTestId("submit-run");
   const responsePromise = createRunResponse(page);
 
@@ -169,7 +151,7 @@ test("a delayed create request keeps submit disabled and does not duplicate the 
   releaseCreate();
   const response = await responsePromise;
   expect(response.status(), await response.text()).toBe(201);
-  await expect(page).toHaveURL(/\/runs\//);
+  await expect(page).toHaveURL(new RegExp(`/runs/${run.id}$`));
   expect(createPostCount).toBe(1);
 });
 

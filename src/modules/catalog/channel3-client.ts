@@ -75,7 +75,7 @@ export type Channel3ErrorCode =
   | "CHANNEL3_API_ERROR";
 
 const safeMessages: Record<Channel3ErrorCode, string> = {
-  CHANNEL3_UNAVAILABLE: "Channel3 is not configured on the server. Add CHANNEL3_API_KEY or use Demo fixtures.",
+  CHANNEL3_UNAVAILABLE: "Channel3 is not configured on the server. Add CHANNEL3_API_KEY to enable live product research.",
   CHANNEL3_UNAUTHORIZED: "Channel3 rejected the server API key. Check the server configuration; fixtures were not used as a fallback.",
   CHANNEL3_RATE_LIMITED: "Channel3 rate limit was reached. No order was created; try again later.",
   CHANNEL3_TIMEOUT: "Channel3 did not respond in time. No order was created; try again.",
