@@ -5,6 +5,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { RunViewSchema, type CatalogSource, type CreateRunInput } from "@/shared/contracts";
 import type { ApiError } from "@/shared/views";
 import { ArrowRightIcon, PlusIcon, ShieldCheckIcon, SparkIcon, TrashIcon } from "@/components/icons";
+import { CHANNEL3_EXAMPLES, type Channel3Example } from "@/components/channel3-examples";
 
 interface ConstraintDraft {
   id: string;
@@ -16,11 +17,6 @@ interface RunOperation {
   body: string;
   key: string;
 }
-
-const coffeeGoal = "Set up a tablet-based point of sale for a coffee shop so staff can take orders and print customer receipts.";
-const incompatiblePrinterGoal = "Set up receipt printing for my existing HubTab S10 tablet.";
-const protectionPackGoal = "Buy the Samsung 55-inch Class The Frame Pro Neo QLED 4K TV (2026) with the 26 Month Protection Pack for my living room.";
-const noProtectionPackConstraint = "Do not include extended warranties, protection packs, or protection plans.";
 
 function makeConstraint(text = "", enforcement: "hard" | "soft" = "hard"): ConstraintDraft {
   return { id: crypto.randomUUID(), text, enforcement };
@@ -58,35 +54,12 @@ export function MandateForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function loadCoffeeExample() {
-    setCatalogSource("fixtures");
-    setGoal(coffeeGoal);
-    setBudget("800");
-    setConstraints([
-      { id: crypto.randomUUID(), text: "Keep the complete order within the stated budget.", enforcement: "hard" },
-      { id: crypto.randomUUID(), text: "Only include equipment necessary for the stated checkout workflow.", enforcement: "hard" },
-      { id: crypto.randomUUID(), text: "Prefer compact equipment with documented compatibility.", enforcement: "soft" },
-    ]);
-    setError(null);
-  }
-
-  function loadIncompatiblePrinterExample() {
-    setCatalogSource("fixtures");
-    setGoal(incompatiblePrinterGoal);
-    setBudget("250");
-    setConstraints([
-      { id: crypto.randomUUID(), text: "The printer must be compatible with the existing HubTab S10.", enforcement: "hard" },
-    ]);
-    setError(null);
-  }
-
-  function loadProtectionPackExample() {
+  function loadChannel3Example(example: Channel3Example) {
     setCatalogSource("channel3");
-    setGoal(protectionPackGoal);
-    setBudget("1500");
-    setConstraints([
-      { id: crypto.randomUUID(), text: noProtectionPackConstraint, enforcement: "hard" },
-    ]);
+    setGoal(example.goal);
+    setBudget(example.budget);
+    setConstraints(example.constraints.map((constraint) =>
+      makeConstraint(constraint.text, constraint.enforcement)));
     setError(null);
   }
 
@@ -295,34 +268,21 @@ export function MandateForm() {
 
         <div className="form-actions">
           <div className="example-group" aria-labelledby="examples-title">
-            <p id="examples-title" className="field-label">Not sure where to start? Try an example</p>
-            <button
-              type="button"
-              className="example-button"
-              aria-label="Coffee shop example · $800"
-              onClick={loadCoffeeExample}
-              disabled={submitting}
-            >
-              <SparkIcon /> Coffee shop example · $800
-            </button>
-            <button
-              type="button"
-              className="example-button"
-              data-testid="incompatible-printer-example"
-              onClick={loadIncompatiblePrinterExample}
-              disabled={submitting}
-            >
-              <SparkIcon /> Incompatible printer demo · $250
-            </button>
-            <button
-              type="button"
-              className="example-button"
-              data-testid="protection-pack-example"
-              onClick={loadProtectionPackExample}
-              disabled={submitting}
-            >
-              <SparkIcon /> Protection pack guard · Channel3
-            </button>
+            <p id="examples-title" className="field-label">Try a real Channel3 example</p>
+            {CHANNEL3_EXAMPLES.map((example) => (
+              <button
+                type="button"
+                className="example-button"
+                data-testid={`channel3-example-${example.id}`}
+                title={example.goal}
+                onClick={() => loadChannel3Example(example)}
+                disabled={submitting}
+                key={example.id}
+              >
+                <SparkIcon /> {example.label}
+              </button>
+            ))}
+            <p className="field-help">Real product searches. Replay/Live labels show the verified demo mode; current catalog results can change.</p>
           </div>
           <button type="submit" className="button button-primary submit-run" data-testid="submit-run" disabled={submitting}>
             {submitting ? <span className="spinner" aria-hidden="true" /> : <ShieldCheckIcon />}

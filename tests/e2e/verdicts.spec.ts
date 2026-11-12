@@ -117,8 +117,8 @@ test("the incompatible printer demo blocks payment with manufacturer evidence", 
   request,
 }) => {
   await page.goto("/");
-  await page.getByTestId("incompatible-printer-example").click();
-  await expect(page.getByTestId("budget-input")).toHaveValue("250");
+  await page.getByTestId("goal-input").fill("Set up receipt printing for my existing HubTab S10 tablet.");
+  await page.getByTestId("budget-input").fill("250");
 
   const createResponsePromise = page.waitForResponse(
     (response) =>

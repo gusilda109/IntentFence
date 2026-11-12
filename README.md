@@ -93,7 +93,7 @@ npm run dev
 
 Replay is selected automatically in development. No explicit configuration is required; if desired, you can pin it in `.env` with `APP_MODE="replay"`, `PAYPAL_MODE="mock"`, and `DATABASE_URL="file:./dev.db"`.
 
-Open `http://localhost:3000`, click the coffee example button, or enter the goal “Set up a coffee shop checkout based on a tablet” with a budget of `800`. The scenario explores Tablet Hub, POS Supply, Maker Docs, and Checkout Bundles. The expected result is `PARTIAL_ALLOW`: the tablet, compatible printer, and adapter are allowed; the seller-only `Calibration License` for $99 with quarantined prompt injection is blocked. The approved subset creates one simulated Replay Order with a stored request ID.
+Open `http://localhost:3000` and enter the goal “Set up a coffee shop checkout based on a tablet” with a budget of `800`. The scenario explores Tablet Hub, POS Supply, Maker Docs, and Checkout Bundles. The expected result is `PARTIAL_ALLOW`: the tablet, compatible printer, and adapter are allowed; the seller-only `Calibration License` for $99 with quarantined prompt injection is blocked. The approved subset creates one simulated Replay Order with a stored request ID.
 
 Demo pages are available under `/stores/...`; the infected fixture page is visually marked for the operator, while the hidden instruction exists only in the raw HTML.
 
@@ -115,6 +115,9 @@ CHANNEL3_TIMEOUT_MS="10000"
 ```
 
 2. Run `npm run dev`, select `Channel3 · live data`, and enter an open-ended goal and a USD budget. In Replay mode, research and the Policy Engine are deterministic, while PayPal remains simulated; in Live mode, the LLM Actor/Supervisor and PayPal Sandbox are used according to their respective settings.
+
+   The home page includes four human-readable Channel3 presets: a home-office mouse for `ALLOW`, a home podcast starter for `PARTIAL_ALLOW` in Replay, a MacBook requirement conflict for `BLOCK` in Live, and an open-ended audio problem for `REVIEW`. These labels describe the verified demo mode rather than forcing a verdict; live catalog results can change.
+
 3. On the run page, check the `Channel3 · live data` badge and the Evidence Timeline with the `Aggregator` class. Channel3 is never assigned manufacturer or independent-reference status, and the commission rate does not affect ranking or the verdict.
 
 The integration calls only `POST https://api.trychannel3.com/v1/search` and `GET https://api.trychannel3.com/v1/products/{product_id}` with the `US/USD` locale. Channel3 Checkout is not used. Empty search results, no in-stock USD offers, an invalid response, a timeout, rate limiting, or a price/availability change stops the run with a readable error. There is no silent fallback to fixtures, and no ApprovedOrder is created for these errors.

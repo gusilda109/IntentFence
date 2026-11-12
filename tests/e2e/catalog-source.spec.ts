@@ -1,20 +1,20 @@
 import { expect, test } from "@playwright/test";
 import { RunViewSchema } from "../../src/shared/contracts/index.js";
+import { CHANNEL3_EXAMPLES } from "../../src/components/channel3-examples.js";
 
-test("fixture is the default and both demo buttons explicitly restore it", async ({ page }) => {
+test("every real Channel3 example fills its mandate and selects the live catalog", async ({ page }) => {
   await page.goto("/");
   const fixtures = page.getByTestId("catalog-source-fixtures");
   const channel3 = page.getByTestId("catalog-source-channel3");
   await expect(fixtures).toHaveAttribute("aria-pressed", "true");
 
-  await channel3.click();
-  await expect(channel3).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Coffee shop example · $800" }).click();
-  await expect(fixtures).toHaveAttribute("aria-pressed", "true");
-
-  await channel3.click();
-  await page.getByTestId("incompatible-printer-example").click();
-  await expect(fixtures).toHaveAttribute("aria-pressed", "true");
+  for (const example of CHANNEL3_EXAMPLES) {
+    await page.getByTestId(`channel3-example-${example.id}`).click();
+    await expect(channel3).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("goal-input")).toHaveValue(example.goal);
+    await expect(page.getByTestId("budget-input")).toHaveValue(example.budget);
+    await expect(page.locator(".constraint-row")).toHaveCount(example.constraints.length);
+  }
 });
 
 test("unconfigured Channel3 returns a readable error without fixture fallback", async ({ page }) => {
@@ -40,7 +40,8 @@ test("unconfigured Channel3 returns a readable error without fixture fallback", 
 
 test("fixture run persists and displays its selected catalog source", async ({ page, request }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Coffee shop example · $800" }).click();
+  await page.getByTestId("goal-input").fill("Set up a coffee shop checkout based on a tablet");
+  await page.getByTestId("budget-input").fill("800");
   await page.getByTestId("submit-run").click();
   await expect(page).toHaveURL(/\/runs\//);
   await expect(page.getByTestId("catalog-source-result")).toHaveText("Demo fixtures");

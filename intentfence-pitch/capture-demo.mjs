@@ -17,7 +17,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1050 }, deviceScaleFactor: 1 });
 
   await page.goto(base, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /Coffee shop example/ }).click();
+  await page.getByTestId("channel3-example-home-office-mouse").click();
   await page.screenshot({ path: path.join(media, "home.png"), fullPage: false });
 
   const response = await page.request.post(`${base}/api/runs`, {

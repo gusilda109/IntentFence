@@ -2,8 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { RunViewSchema } from "../../src/shared/contracts/index.js";
 import { expectRunRegions } from "./support.js";
 
-function coffeeExampleButton(page: Page) {
-  return page.getByRole("button", { name: /Coffee shop example/i });
+async function loadCoffeeReplay(page: Page) {
+  await page.getByTestId("catalog-source-fixtures").click();
+  await page.getByTestId("goal-input").fill("Set up a coffee shop checkout based on a tablet");
+  await page.getByTestId("budget-input").fill("800");
 }
 
 function createRunResponse(page: Page) {
@@ -41,8 +43,10 @@ test("desktop home exposes the human entry and starts the coffee replay", async 
     "catalog-source-channel3",
     "goal-input",
     "budget-input",
-    "incompatible-printer-example",
-    "protection-pack-example",
+    "channel3-example-home-office-mouse",
+    "channel3-example-home-podcast-microphone",
+    "channel3-example-college-laptop-requirements",
+    "channel3-example-unclear-online-audio",
     "submit-run",
   ]) {
     await expect(page.getByTestId(testId)).toBeVisible();
@@ -54,7 +58,7 @@ test("desktop home exposes the human entry and starts the coffee replay", async 
     exact: true,
   })).toBeVisible();
 
-  await coffeeExampleButton(page).click();
+  await loadCoffeeReplay(page);
   await expect(page.getByTestId("goal-input")).toHaveValue(/coffee shop/i);
   await expect(page.getByTestId("budget-input")).toHaveValue("800");
 
@@ -92,19 +96,19 @@ test("mobile home and coffee run stay within the viewport and keep controls usab
   const goal = page.getByTestId("goal-input");
   const budget = page.getByTestId("budget-input");
   const submit = page.getByTestId("submit-run");
-  const coffeeExample = coffeeExampleButton(page);
+  const channel3Example = page.getByTestId("channel3-example-home-office-mouse");
 
   await expectNoHorizontalOverflow(page);
   await expect(goal).toBeVisible();
   await expect(goal).toBeEditable();
   await expect(budget).toBeVisible();
   await expect(budget).toBeEditable();
-  await expect(coffeeExample).toBeVisible();
-  await expect(coffeeExample).toBeEnabled();
+  await expect(channel3Example).toBeVisible();
+  await expect(channel3Example).toBeEnabled();
   await expect(submit).toBeVisible();
   await expect(submit).toBeEnabled();
 
-  await coffeeExample.click();
+  await loadCoffeeReplay(page);
   await expect(goal).toHaveValue(/coffee shop/i);
   await expect(budget).toHaveValue("800");
 
@@ -151,7 +155,7 @@ test("a delayed create request keeps submit disabled and does not duplicate the 
   });
 
   await page.goto("/");
-  await coffeeExampleButton(page).click();
+  await loadCoffeeReplay(page);
   const submit = page.getByTestId("submit-run");
   const responsePromise = createRunResponse(page);
 
